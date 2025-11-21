@@ -1,0 +1,819 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.1247714,
+              41.3767285,
+              0
+            ],
+            [
+              2.1247419,
+              41.3767416,
+              0
+            ],
+            [
+              2.1247071,
+              41.3767461,
+              0
+            ],
+            [
+              2.1246561,
+              41.3767433,
+              0
+            ],
+            [
+              2.1232801,
+              41.3759133,
+              0
+            ],
+            [
+              2.1232593,
+              41.37587,
+              0
+            ],
+            [
+              2.1232489,
+              41.3758333,
+              0
+            ],
+            [
+              2.1232598,
+              41.3757948,
+              0
+            ],
+            [
+              2.1232814,
+              41.3757524,
+              0
+            ],
+            [
+              2.1233311,
+              41.3757221,
+              0
+            ],
+            [
+              2.1233988,
+              41.375702,
+              0
+            ],
+            [
+              2.1250986,
+              41.3756588,
+              0
+            ],
+            [
+              2.1251462,
+              41.3756895,
+              0
+            ],
+            [
+              2.1252006,
+              41.3761086,
+              0
+            ],
+            [
+              2.1247714,
+              41.3767285,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA DE SANTS",
+        "styleUrl": "#poly-000000-5801-77-nodesc",
+        "fill-opacity": 0.30196078431372547,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 5.801,
+        "sourceFile": "TERRITORIO 1.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.1244608,
+          41.3760575,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 1.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.1253725,
+              41.3761963,
+              0
+            ],
+            [
+              2.1253467,
+              41.3761769,
+              0
+            ],
+            [
+              2.1253271,
+              41.3761587,
+              0
+            ],
+            [
+              2.1253115,
+              41.3761309,
+              0
+            ],
+            [
+              2.1253024,
+              41.3761072,
+              0
+            ],
+            [
+              2.1252799,
+              41.3757756,
+              0
+            ],
+            [
+              2.1252866,
+              41.3757505,
+              0
+            ],
+            [
+              2.1252967,
+              41.3757289,
+              0
+            ],
+            [
+              2.1253145,
+              41.3757105,
+              0
+            ],
+            [
+              2.1253368,
+              41.3756953,
+              0
+            ],
+            [
+              2.1253658,
+              41.3756831,
+              0
+            ],
+            [
+              2.1254047,
+              41.3756735,
+              0
+            ],
+            [
+              2.1266378,
+              41.3756534,
+              0
+            ],
+            [
+              2.125976,
+              41.376394,
+              0
+            ],
+            [
+              2.1259572,
+              41.3764054,
+              0
+            ],
+            [
+              2.1259324,
+              41.3764126,
+              0
+            ],
+            [
+              2.1258945,
+              41.3764126,
+              0
+            ],
+            [
+              2.1253725,
+              41.3761963,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA DE SANTS",
+        "styleUrl": "#poly-000000-5201-89-nodesc",
+        "fill-opacity": 0.34901960784313724,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 5.201,
+        "sourceFile": "TERRITORIO 2.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.1258513,
+          41.3759497,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 2.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.1260279,
+              41.3764286,
+              0
+            ],
+            [
+              2.1264051,
+              41.3759943,
+              0
+            ],
+            [
+              2.1266938,
+              41.3756787,
+              0
+            ],
+            [
+              2.1267213,
+              41.3756583,
+              0
+            ],
+            [
+              2.1267584,
+              41.3756498,
+              0
+            ],
+            [
+              2.1271268,
+              41.3756424,
+              0
+            ],
+            [
+              2.1271427,
+              41.3756583,
+              0
+            ],
+            [
+              2.127141,
+              41.3756779,
+              0
+            ],
+            [
+              2.1269098,
+              41.3762382,
+              0
+            ],
+            [
+              2.1266948,
+              41.3767019,
+              0
+            ],
+            [
+              2.1266649,
+              41.3767044,
+              0
+            ],
+            [
+              2.1260349,
+              41.3764498,
+              0
+            ],
+            [
+              2.1260279,
+              41.3764286,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA DE SANTS",
+        "styleUrl": "#poly-000000-5501-89-nodesc",
+        "fill-opacity": 0.34901960784313724,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 5.501,
+        "sourceFile": "TERRITORIO 3.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.126612,
+          41.3761489,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 3.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.1267783,
+              41.3767217,
+              0
+            ],
+            [
+              2.127245,
+              41.3756388,
+              0
+            ],
+            [
+              2.1291225,
+              41.3755997,
+              0
+            ],
+            [
+              2.1287658,
+              41.3761592,
+              0
+            ],
+            [
+              2.1287309,
+              41.3761662,
+              0
+            ],
+            [
+              2.1283848,
+              41.3761088,
+              0
+            ],
+            [
+              2.1284412,
+              41.3759639,
+              0
+            ],
+            [
+              2.1283835,
+              41.3759529,
+              0
+            ],
+            [
+              2.1281951,
+              41.3764077,
+              0
+            ],
+            [
+              2.1280174,
+              41.3764037,
+              0
+            ],
+            [
+              2.1278176,
+              41.3764268,
+              0
+            ],
+            [
+              2.127772,
+              41.3764343,
+              0
+            ],
+            [
+              2.1277425,
+              41.37646,
+              0
+            ],
+            [
+              2.1275688,
+              41.3770548,
+              0
+            ],
+            [
+              2.1275306,
+              41.3770618,
+              0
+            ],
+            [
+              2.126793,
+              41.3767509,
+              0
+            ],
+            [
+              2.1267783,
+              41.3767217,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA DE SANTS",
+        "styleUrl": "#poly-000000-5501-82-nodesc",
+        "fill-opacity": 0.3215686274509804,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 5.501,
+        "sourceFile": "TERRITORIO 4.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.1277278,
+          41.3760273,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 4.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.1301274,
+              41.3757164,
+              0
+            ],
+            [
+              2.1299504,
+              41.3763097,
+              0
+            ],
+            [
+              2.1299399,
+              41.3763297,
+              0
+            ],
+            [
+              2.1299297,
+              41.3763422,
+              0
+            ],
+            [
+              2.12992,
+              41.3763509,
+              0
+            ],
+            [
+              2.129908,
+              41.3763571,
+              0
+            ],
+            [
+              2.1298944,
+              41.3763617,
+              0
+            ],
+            [
+              2.1298786,
+              41.376362,
+              0
+            ],
+            [
+              2.1298549,
+              41.376359,
+              0
+            ],
+            [
+              2.1290444,
+              41.3762251,
+              0
+            ],
+            [
+              2.1288478,
+              41.3761835,
+              0
+            ],
+            [
+              2.1288335,
+              41.3761795,
+              0
+            ],
+            [
+              2.1288258,
+              41.3761728,
+              0
+            ],
+            [
+              2.1288204,
+              41.376164,
+              0
+            ],
+            [
+              2.1288191,
+              41.3761574,
+              0
+            ],
+            [
+              2.128821,
+              41.3761479,
+              0
+            ],
+            [
+              2.1288242,
+              41.3761398,
+              0
+            ],
+            [
+              2.1291418,
+              41.3756446,
+              0
+            ],
+            [
+              2.1291665,
+              41.3756218,
+              0
+            ],
+            [
+              2.1291967,
+              41.3756079,
+              0
+            ],
+            [
+              2.1292264,
+              41.3755992,
+              0
+            ],
+            [
+              2.1292614,
+              41.3755943,
+              0
+            ],
+            [
+              2.1300402,
+              41.3755803,
+              0
+            ],
+            [
+              2.1300761,
+              41.3755812,
+              0
+            ],
+            [
+              2.1300969,
+              41.3755864,
+              0
+            ],
+            [
+              2.1301096,
+              41.375594,
+              0
+            ],
+            [
+              2.1301204,
+              41.3756026,
+              0
+            ],
+            [
+              2.1301274,
+              41.375616,
+              0
+            ],
+            [
+              2.1301327,
+              41.375631,
+              0
+            ],
+            [
+              2.1301354,
+              41.3756473,
+              0
+            ],
+            [
+              2.1301333,
+              41.3756815,
+              0
+            ],
+            [
+              2.1301274,
+              41.3757164,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA DE SANTS",
+        "styleUrl": "#poly-000000-5401-84-nodesc",
+        "fill-opacity": 0.32941176470588235,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 5.401,
+        "sourceFile": "TERRITORIO 5.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.1295363,
+          41.3759295,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR ",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 5.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              2.1296831,
+              41.3768725,
+              0
+            ],
+            [
+              2.1282615,
+              41.3765615,
+              0
+            ],
+            [
+              2.1283004,
+              41.3764669,
+              0
+            ],
+            [
+              2.1282642,
+              41.3764055,
+              0
+            ],
+            [
+              2.1283638,
+              41.3761608,
+              0
+            ],
+            [
+              2.1298664,
+              41.3764089,
+              0
+            ],
+            [
+              2.1298883,
+              41.3764508,
+              0
+            ],
+            [
+              2.1297367,
+              41.3768499,
+              0
+            ],
+            [
+              2.1296831,
+              41.3768725,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA DE SANTS",
+        "styleUrl": "#poly-000000-5601-89-nodesc",
+        "fill-opacity": 0.34901960784313724,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 5.601,
+        "sourceFile": "TERRITORIO 6.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.1291017,
+          41.3765142,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 6.kml"
+      }
+    }
+  ]
+}
