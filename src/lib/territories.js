@@ -116,3 +116,22 @@ export function calculateCentroid(geoJson) {
 
     return [centerLat, centerLng];
 }
+
+/**
+ * Calculates the centroid of a single feature.
+ * @param {Object} feature - The GeoJSON feature.
+ * @returns {Array} - The [lat, lng] of the centroid.
+ */
+export function calculateFeatureCentroid(feature) {
+    if (!feature || !feature.geometry) return null;
+
+    // Wrap feature in a GeoJSON structure to reuse calculateBounds
+    const bounds = calculateBounds({ features: [feature] });
+    if (!bounds) return null;
+
+    const [[minLat, minLng], [maxLat, maxLng]] = bounds;
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+
+    return [centerLat, centerLng];
+}

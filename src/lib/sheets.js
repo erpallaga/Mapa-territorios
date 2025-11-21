@@ -33,22 +33,37 @@ export async function fetchTerritoryData(sheetUrl) {
                         const status = row[2] === 'Libre' ? 'free' : 'assigned';
                         const lastCompletedDate = row[3];
 
-                        // Find latest assignment
+                        // Find latest assignment and calculate 12-month history
                         // Groups start at index 4. Each group is 3 columns: 
                         // [Assignee, Date Assigned, Date Completed]
                         let publisher = '';
                         let assignedDate = '';
+                        let completionCount12m = 0;
+
+                        const oneYearAgo = new Date();
+                        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
                         // Iterate through groups of 3 columns
                         for (let i = 4; i < row.length; i += 3) {
                             const p = row[i];
                             const d = row[i + 1];
+                            const c = row[i + 2]; // Completion Date
 
                             // If there is a publisher name, update our latest info
-                            // We check if p exists and is not just whitespace
                             if (p && p.trim() !== '') {
                                 publisher = p;
                                 assignedDate = d;
+                            }
+
+                            // Check completion date for 12-month count
+                            if (c && c.trim() !== '') {
+                                const [day, month, year] = c.split(/[\/\-]/).map(Number);
+                                if (day && month && year) {
+                                    const completionDate = new Date(year, month - 1, day);
+                                    if (completionDate >= oneYearAgo) {
+                                        completionCount12m++;
+                                    }
+                                }
                             }
                         }
 
@@ -58,7 +73,8 @@ export async function fetchTerritoryData(sheetUrl) {
                             status,
                             publisher,
                             assignedDate,
-                            lastCompletedDate
+                            lastCompletedDate,
+                            completionCount12m
                         };
                     });
                     resolve(mappedData);

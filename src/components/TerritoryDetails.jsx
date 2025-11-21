@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, User, MapPin, Hash } from 'lucide-react';
+import { X, Calendar, User, MapPin, Hash, History } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function TerritoryDetails({ territory, onClose, isOpen }) {
@@ -61,6 +61,11 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
                             label="Última entrega"
                             value={territory.lastCompletedDate || '-'}
+                        />
+                        <DetailRow
+                            icon={<History className="w-5 h-5 text-gray-400" />}
+                            label="Veces trabajado (12 meses)"
+                            value={territory.completionCount12m || 0}
                         />
                     </div>
 
