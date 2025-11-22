@@ -41,3 +41,21 @@ npm run dev
 - Vite
 - Leaflet / React-Leaflet
 - Tailwind CSS
+
+## Deployment
+
+This project is configured for static deployment on Vercel.
+
+### How it works
+The `build` script is configured to automatically process KML files into JSON before building the application. This means you don't need to manually run the conversion script.
+
+### Steps to Deploy
+1. Push your code to GitHub.
+2. Import the project into Vercel.
+3. Vercel will detect the Vite settings and deploy automatically.
+
+### Updating the Map
+To update the territories:
+1. Add or replace KML files in the `kmlfiles` directory.
+2. Commit and push the changes to GitHub.
+3. Vercel will automatically rebuild and deploy the site with the new data.
