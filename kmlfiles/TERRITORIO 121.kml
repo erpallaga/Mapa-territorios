@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>TERRITORIO 121</name>
+    <description><![CDATA[Trabajar toda la zona sombreada.<br>46 viviendas]]></description>
+    <Style id="icon-1899-0288D1-nodesc-normal">
+      <IconStyle>
+        <color>ffd18802</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1899-0288D1-nodesc-highlight">
+      <IconStyle>
+        <color>ffd18802</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1899-0288D1-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1899-0288D1-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1899-0288D1-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="poly-000000-4501-87-nodesc-normal">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>4.501</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>57000000</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="poly-000000-4501-87-nodesc-highlight">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>6.7515</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>57000000</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="poly-000000-4501-87-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#poly-000000-4501-87-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#poly-000000-4501-87-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>CONG. SARRIÀ-LES CORTS 119</name>
+      <Placemark>
+        <name>ZONA PEDRALBES</name>
+        <styleUrl>#poly-000000-4501-87-nodesc</styleUrl>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <tessellate>1</tessellate>
+              <coordinates>
+                2.1119651,41.3938984,0
+                2.1115896,41.3937616,0
+                2.1111926,41.3936409,0
+                2.1109351,41.3936328,0
+                2.1106347,41.3936328,0
+                2.1103343,41.3936489,0
+                2.1100875,41.3936972,0
+                2.1099534,41.3936811,0
+                2.1098408,41.3936087,0
+                2.1090683,41.3920553,0
+                2.1078586,41.3897633,0
+                2.1081993,41.3895279,0
+                2.1085748,41.3896406,0
+                2.1110531,41.3912745,0
+                2.1113965,41.3915321,0
+                2.1115037,41.3917172,0
+                2.1115896,41.3919104,0
+                2.1116325,41.3920714,0
+                2.1119651,41.3938984,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark>
+        <name>COMO LLEGAR</name>
+        <styleUrl>#icon-1899-0288D1-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            2.1102538,41.3919063,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>
