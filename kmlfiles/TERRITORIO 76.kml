@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>TERRITORIO 76</name>
+    <description><![CDATA[Trabajar la zona sombreada.<br>225 viviendas]]></description>
+    <Style id="icon-1899-0288D1-nodesc-normal">
+      <IconStyle>
+        <color>ffd18802</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1899-0288D1-nodesc-highlight">
+      <IconStyle>
+        <color>ffd18802</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1899-0288D1-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1899-0288D1-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1899-0288D1-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="poly-000000-5401-77-nodesc-normal">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>5.401</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4d000000</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="poly-000000-5401-77-nodesc-highlight">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>8.1015</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>4d000000</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="poly-000000-5401-77-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#poly-000000-5401-77-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#poly-000000-5401-77-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>CONG. SARRIÀ-LES CORTS 76</name>
+      <Placemark>
+        <name>COMO LLEGAR</name>
+        <styleUrl>#icon-1899-0288D1-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            2.1209432,41.3764051,0
+          </coordinates>
+        </Point>
+      </Placemark>
+      <Placemark>
+        <name>ZONA LES CORTS-HOSPITALET</name>
+        <styleUrl>#poly-000000-5401-77-nodesc</styleUrl>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <tessellate>1</tessellate>
+              <coordinates>
+                2.1202669,41.3763834,0
+                2.1202618,41.3763799,0
+                2.1202535,41.3763721,0
+                2.1202478,41.376365,0
+                2.1202421,41.3763575,0
+                2.1202377,41.3763494,0
+                2.1202353,41.3763436,0
+                2.1202347,41.3763363,0
+                2.1202343,41.3763293,0
+                2.1202347,41.376321,0
+                2.1202377,41.3763114,0
+                2.1202414,41.3763051,0
+                2.1205173,41.375958,0
+                2.1205223,41.3759527,0
+                2.1205287,41.3759486,0
+                2.1205351,41.3759439,0
+                2.1205448,41.3759406,0
+                2.1205545,41.3759378,0
+                2.1205686,41.3759368,0
+                2.120576,41.3759378,0
+                2.1205881,41.3759401,0
+                2.1205988,41.3759429,0
+                2.1206125,41.3759476,0
+                2.120629,41.3759562,0
+                2.1214108,41.3763431,0
+                2.121439,41.3763623,0
+                2.1214578,41.3763743,0
+                2.1214725,41.3763889,0
+                2.1214846,41.3764045,0
+                2.1214913,41.3764211,0
+                2.1214953,41.3764413,0
+                2.1215,41.3765464,0
+                2.1214913,41.3765751,0
+                2.1214806,41.3765992,0
+                2.1214846,41.3769349,0
+                2.1213941,41.3769344,0
+                2.1213746,41.3769318,0
+                2.1213478,41.3769278,0
+                2.1213156,41.3769173,0
+                2.1212874,41.3769062,0
+                2.121046,41.3767862,0
+                2.1202669,41.3763834,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>
