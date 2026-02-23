@@ -15,7 +15,7 @@ export function Legend({ viewMode }) {
         ];
 
     return (
-        <div className="absolute bottom-4 left-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-3 flex flex-col gap-2 max-w-[200px] md:bottom-20 lg:bottom-4">
+        <div className="absolute bottom-24 left-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-3 flex flex-col gap-2 max-w-[200px] md:bottom-4">
             <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Leyenda</h4>
             <div className="space-y-1.5">
                 {items.map((item, idx) => (
