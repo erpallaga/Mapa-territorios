@@ -30,7 +30,8 @@ export async function fetchTerritoryData(sheetUrl) {
                         // 3: Última fecha en que se completó*
                         const id = row[0];
                         const zone = row[1];
-                        const status = row[2] === 'Libre' ? 'free' : 'assigned';
+                        const statusValue = (row[2] || '').trim().toUpperCase();
+                        const status = statusValue === 'LIBRE' ? 'free' : 'assigned';
                         const lastCompletedDate = row[3];
 
                         // Find latest assignment and calculate 12-month history
