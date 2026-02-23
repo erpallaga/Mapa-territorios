@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>TERRITORIO 147</name>
+    <description><![CDATA[Trabajar la zona sombreada.<br>272 viviendas]]></description>
+    <Style id="icon-1899-0288D1-nodesc-normal">
+      <IconStyle>
+        <color>ffd18802</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>0</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="icon-1899-0288D1-nodesc-highlight">
+      <IconStyle>
+        <color>ffd18802</color>
+        <scale>1</scale>
+        <Icon>
+          <href>https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png</href>
+        </Icon>
+        <hotSpot x="32" xunits="pixels" y="64" yunits="insetPixels"/>
+      </IconStyle>
+      <LabelStyle>
+        <scale>1</scale>
+      </LabelStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="icon-1899-0288D1-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#icon-1899-0288D1-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#icon-1899-0288D1-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Style id="poly-000000-5401-89-nodesc-normal">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>5.401</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>59000000</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <Style id="poly-000000-5401-89-nodesc-highlight">
+      <LineStyle>
+        <color>ff000000</color>
+        <width>8.1015</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>59000000</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+      <BalloonStyle>
+        <text><![CDATA[<h3>$[name]</h3>]]></text>
+      </BalloonStyle>
+    </Style>
+    <StyleMap id="poly-000000-5401-89-nodesc">
+      <Pair>
+        <key>normal</key>
+        <styleUrl>#poly-000000-5401-89-nodesc-normal</styleUrl>
+      </Pair>
+      <Pair>
+        <key>highlight</key>
+        <styleUrl>#poly-000000-5401-89-nodesc-highlight</styleUrl>
+      </Pair>
+    </StyleMap>
+    <Folder>
+      <name>CONG. SARRIÀ-LES CORTS 147</name>
+      <Placemark>
+        <name>ZONA SARRIÀ</name>
+        <styleUrl>#poly-000000-5401-89-nodesc</styleUrl>
+        <Polygon>
+          <outerBoundaryIs>
+            <LinearRing>
+              <tessellate>1</tessellate>
+              <coordinates>
+                2.1249601,41.3935246,0
+                2.1249399,41.3935137,0
+                2.124929,41.3935039,0
+                2.1249161,41.39349,0
+                2.1249056,41.3934696,0
+                2.124899,41.3934474,0
+                2.1248966,41.3934273,0
+                2.1248984,41.3934071,0
+                2.1249028,41.3933884,0
+                2.1251121,41.3927317,0
+                2.1251194,41.3927198,0
+                2.1251244,41.392714,0
+                2.1251377,41.3927084,0
+                2.1251562,41.3927052,0
+                2.1251719,41.3927046,0
+                2.1251867,41.3927067,0
+                2.125197,41.3927098,0
+                2.1252099,41.3927126,0
+                2.12522,41.3927171,0
+                2.1262067,41.3931763,0
+                2.1262415,41.3931966,0
+                2.1262657,41.3932141,0
+                2.1262956,41.3932417,0
+                2.1263204,41.3932716,0
+                2.1263298,41.3932894,0
+                2.1263365,41.393306,0
+                2.1263432,41.3933229,0
+                2.126346,41.3933407,0
+                2.1263454,41.3933583,0
+                2.1263417,41.3933747,0
+                2.1263334,41.3933955,0
+                2.1260756,41.393931,0
+                2.126058,41.3939554,0
+                2.1260464,41.3939649,0
+                2.126038,41.3939703,0
+                2.1260266,41.3939759,0
+                2.1260132,41.3939805,0
+                2.1260011,41.3939813,0
+                2.1259864,41.3939803,0
+                2.125971,41.3939759,0
+                2.1249601,41.3935246,0
+              </coordinates>
+            </LinearRing>
+          </outerBoundaryIs>
+        </Polygon>
+      </Placemark>
+      <Placemark>
+        <name>COMO LLEGAR</name>
+        <styleUrl>#icon-1899-0288D1-nodesc</styleUrl>
+        <Point>
+          <coordinates>
+            2.1256172,41.393305,0
+          </coordinates>
+        </Point>
+      </Placemark>
+    </Folder>
+  </Document>
+</kml>
