@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Marker } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css';
 import { cn } from '../lib/utils';
 import { calculateBounds, calculateFeatureCentroid } from '../lib/territories';
+import { Legend } from './Legend';
 
 // Fix for default Leaflet icon issues in React
 import L from 'leaflet';
@@ -230,6 +231,9 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
 
                 <MapController bounds={mapBounds} />
             </MapContainer>
+
+            {/* Map Legend */}
+            <Legend viewMode={viewMode} />
         </div>
     );
 }
