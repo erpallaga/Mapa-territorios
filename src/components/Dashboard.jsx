@@ -42,17 +42,20 @@ export function Dashboard({ territories }) {
             const free = unique.filter(t => t.properties.status === 'free').length;
             const assigned = unique.filter(t => t.properties.status === 'assigned').length;
 
+            const freePct = total > 0 ? Math.round((free / total) * 100) : 0;
+            const assignedPct = total > 0 ? Math.round((assigned / total) * 100) : 0;
+
             globalStats = {
                 cards: [
                     { label: 'Total Territorios', value: total, color: 'text-gray-900' },
-                    { label: 'Libres', value: free, color: 'text-green-600' },
-                    { label: 'Asignados', value: assigned, color: 'text-red-600' }
+                    { label: 'Libres', value: free, color: 'text-green-600', percentage: freePct },
+                    { label: 'Asignados', value: assigned, color: 'text-red-600', percentage: assignedPct }
                 ]
             };
 
             chartData = [
-                { name: 'Libres', value: free, color: '#22c55e' },
-                { name: 'Asignados', value: assigned, color: '#ef4444' },
+                { name: `Libres (${freePct}%)`, value: free, color: '#22c55e' },
+                { name: `Asignados (${assignedPct}%)`, value: assigned, color: '#ef4444' },
             ];
         } else {
             // 12 Months View
@@ -69,11 +72,15 @@ export function Dashboard({ territories }) {
 
             const notWorked = total - workedOrAssignedCount;
 
+            const workedPct = total > 0 ? Math.round((worked.length / total) * 100) : 0;
+            const assignedPct = total > 0 ? Math.round((assigned.length / total) * 100) : 0;
+            const notWorkedPct = total > 0 ? Math.round((notWorked / total) * 100) : 0;
+
             globalStats = {
                 cards: [
-                    { label: 'Trabajados (12m)', value: worked.length, color: 'text-blue-600' },
-                    { label: 'Asignados actualmente', value: assigned.length, color: 'text-red-600' },
-                    { label: 'Sin trabajar', value: notWorked, color: 'text-gray-500' }
+                    { label: 'Trabajados (12m)', value: worked.length, color: 'text-blue-600', percentage: workedPct },
+                    { label: 'Asignados actualmente', value: assigned.length, color: 'text-red-600', percentage: assignedPct },
+                    { label: 'Sin trabajar', value: notWorked, color: 'text-gray-500', percentage: notWorkedPct }
                 ]
             };
 
@@ -81,12 +88,16 @@ export function Dashboard({ territories }) {
             // Priority: Trabajados -> Asignados (not worked) -> Rest (Sin trabajar)
             const chartWorked = worked.length;
             const chartAssignedOnly = assigned.filter(t => !workedIds.has(t.properties.id)).length;
-            const chartRest = notWorked; // Should be same as above logic
+            const chartRest = notWorked;
+
+            const chartWorkedPct = total > 0 ? Math.round((chartWorked / total) * 100) : 0;
+            const chartAssignedOnlyPct = total > 0 ? Math.round((chartAssignedOnly / total) * 100) : 0;
+            const chartRestPct = total > 0 ? Math.round((chartRest / total) * 100) : 0;
 
             chartData = [
-                { name: 'Trabajados', value: chartWorked, color: '#2563eb' },
-                { name: 'Asignados (No trab.)', value: chartAssignedOnly, color: '#ef4444' },
-                { name: 'Sin trabajar', value: chartRest, color: '#9ca3af' },
+                { name: `Trabajados (${chartWorkedPct}%)`, value: chartWorked, color: '#2563eb' },
+                { name: `Asignados (${chartAssignedOnlyPct}%)`, value: chartAssignedOnly, color: '#ef4444' },
+                { name: `Sin trabajar (${chartRestPct}%)`, value: chartRest, color: '#9ca3af' },
             ];
         }
 
@@ -146,8 +157,8 @@ export function Dashboard({ territories }) {
                     <button
                         onClick={() => setViewMode('current')}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'current'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-900'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
                             }`}
                     >
                         Actualmente
@@ -155,8 +166,8 @@ export function Dashboard({ territories }) {
                     <button
                         onClick={() => setViewMode('12months')}
                         className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === '12months'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-900'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
                             }`}
                     >
                         Últimos 12 meses
@@ -169,7 +180,13 @@ export function Dashboard({ territories }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     <div className={`col-span-1 md:col-span-2 grid grid-cols-2 ${viewMode === 'current' ? 'md:grid-cols-3' : 'md:grid-cols-3'} gap-4`}>
                         {stats.cards.map((card, idx) => (
-                            <StatCard key={idx} label={card.label} value={card.value} color={card.color} />
+                            <StatCard
+                                key={idx}
+                                label={card.label}
+                                value={card.value}
+                                color={card.color}
+                                percentage={card.percentage}
+                            />
                         ))}
                     </div>
                     <div className="h-[200px]">
@@ -179,10 +196,11 @@ export function Dashboard({ territories }) {
                                     data={chartData}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
+                                    innerRadius={50}
+                                    outerRadius={70}
                                     paddingAngle={5}
                                     dataKey="value"
+                                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
                                 >
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -207,11 +225,14 @@ export function Dashboard({ territories }) {
     );
 }
 
-function StatCard({ label, value, color }) {
+function StatCard({ label, value, color, percentage }) {
     return (
         <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-100">
             <p className="text-sm text-gray-500 mb-1">{label}</p>
             <p className={`text-3xl font-bold ${color}`}>{value}</p>
+            {percentage !== undefined && (
+                <p className="text-xs text-gray-400 mt-1">{percentage}% del total</p>
+            )}
         </div>
     );
 }
@@ -230,8 +251,8 @@ function ZoneCard({ zone, mode }) {
 
                 <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                        <span className="text-green-600 font-medium">{zone.free} Libres</span>
                         <span className="text-red-600 font-medium">{zone.assigned} Asignados</span>
+                        <span className="text-green-600 font-medium">{zone.free} Libres</span>
                     </div>
 
                     <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
@@ -240,7 +261,7 @@ function ZoneCard({ zone, mode }) {
                             style={{ width: `${coverage}%` }}
                         ></div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left">
                         <span className="text-xs text-gray-500">{coverage}% Asignado</span>
                     </div>
                 </div>
