@@ -15,16 +15,16 @@ export function Legend({ viewMode }) {
         ];
 
     return (
-        <div className="absolute bottom-24 left-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-3 flex flex-col gap-2 max-w-[200px] md:bottom-4">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Leyenda</h4>
-            <div className="space-y-1.5">
+        <div className="absolute bottom-24 left-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-3 flex flex-col gap-2 w-fit max-w-[calc(100%-2rem)] md:bottom-4 md:max-w-[200px]">
+            <h4 className="text-[10px] md:text-xs font-bold text-gray-400 md:text-gray-500 uppercase tracking-wider">Leyenda</h4>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 md:flex-col md:items-start md:space-y-1.5 md:gap-x-0">
                 {items.map((item, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
+                    <div key={idx} className="flex items-center gap-1.5">
                         <div
-                            className="w-4 h-4 rounded-sm border border-black/10 flex-shrink-0"
+                            className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-sm border border-black/10 flex-shrink-0"
                             style={{ backgroundColor: item.color }}
                         />
-                        <span className="text-xs font-medium text-gray-700 leading-none">{item.label}</span>
+                        <span className="text-[11px] md:text-xs font-medium text-gray-700 leading-none whitespace-nowrap">{item.label}</span>
                     </div>
                 ))}
             </div>
