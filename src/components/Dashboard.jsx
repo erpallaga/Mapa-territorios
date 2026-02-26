@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from 'recharts';
 
 export function Dashboard({ territories }) {
     const [viewMode, setViewMode] = useState('current'); // 'current' | '12months'
@@ -7,7 +7,7 @@ export function Dashboard({ territories }) {
     if (!territories) return null;
 
     // Process data: Deduplicate and calculate stats
-    const { uniqueTerritories, stats, chartData, zoneStats } = useMemo(() => {
+    const { uniqueTerritories, stats, chartData, frequencyData, zoneStats } = useMemo(() => {
         const uniqueMap = new Map();
 
         // Deduplicate by ID
@@ -42,6 +42,7 @@ export function Dashboard({ territories }) {
         // Global Stats Calculation
         let globalStats = {};
         let chartData = [];
+        let frequencyData = [];
 
         if (viewMode === 'current') {
             const free = unique.filter(t => t.properties.status === 'free').length;
@@ -126,6 +127,20 @@ export function Dashboard({ territories }) {
                 { name: `Asignados (${assignedPct}%)`, value: assignedTotal, color: '#f59e0b' },
                 { name: `Libres (${freePct}%)`, value: freeTotal, color: '#ef4444' },
             ].filter(d => d.value > 0); // Hide empty segments
+
+            const frequencyMap = {};
+            unique.forEach(t => {
+                const count = t.properties.completionCount12m || 0;
+                frequencyMap[count] = (frequencyMap[count] || 0) + 1;
+            });
+
+            frequencyData = Object.keys(frequencyMap)
+                .map(Number)
+                .sort((a, b) => a - b)
+                .map(count => ({
+                    name: `${count} veces`,
+                    territorios: frequencyMap[count]
+                }));
         }
 
         // Zone Stats Calculation
@@ -176,6 +191,7 @@ export function Dashboard({ territories }) {
             uniqueTerritories: unique,
             stats: globalStats,
             chartData,
+            frequencyData,
             zoneStats: zoneStatsArray
         };
     }, [territories, viewMode]);
@@ -209,7 +225,7 @@ export function Dashboard({ territories }) {
 
             {/* Global Overview */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className={`grid grid-cols-1 gap-8 ${viewMode === '12months' ? 'xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-3'}`}>
                     <div className={`col-span-1 md:col-span-2 grid grid-cols-2 ${viewMode === 'current' ? 'md:grid-cols-3' : 'md:grid-cols-3'} gap-4`}>
                         {stats.cards.map((card, idx) => (
                             <StatCard
@@ -251,6 +267,24 @@ export function Dashboard({ territories }) {
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
+                    {viewMode === '12months' && stats.cards?.length > 0 && (
+                        <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={frequencyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="colorFreq" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                                    <Tooltip />
+                                    <Area type="monotone" dataKey="territorios" stroke="#3b82f6" fillOpacity={1} fill="url(#colorFreq)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
                 </div>
             </div>
             {/* Zone Breakdown */}
