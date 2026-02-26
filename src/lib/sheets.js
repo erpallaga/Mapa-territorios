@@ -40,6 +40,7 @@ export async function fetchTerritoryData(sheetUrl) {
                         let publisher = '';
                         let assignedDate = '';
                         let completionCount12m = 0;
+                        const history = [];
 
                         const oneYearAgo = new Date();
                         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
@@ -54,19 +55,29 @@ export async function fetchTerritoryData(sheetUrl) {
                             if (p && p.trim() !== '') {
                                 publisher = p;
                                 assignedDate = d;
+
+                                history.push({
+                                    publisher: p.trim(),
+                                    assignedDate: (d || '').trim(),
+                                    completedDate: (c || '').trim()
+                                });
                             }
 
                             // Check completion date for 12-month count
                             if (c && c.trim() !== '') {
                                 const [day, month, year] = c.split(/[\/\-]/).map(Number);
-                                if (day && month && year) {
-                                    const completionDate = new Date(year, month - 1, day);
+                                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                                    const fullYear = year < 100 ? year + 2000 : year;
+                                    const completionDate = new Date(fullYear, month - 1, day);
                                     if (completionDate >= oneYearAgo) {
                                         completionCount12m++;
                                     }
                                 }
                             }
                         }
+
+                        // Reverse history so latest assignments show up at the top
+                        history.reverse();
 
                         return {
                             id,
@@ -75,7 +86,8 @@ export async function fetchTerritoryData(sheetUrl) {
                             publisher,
                             assignedDate,
                             lastCompletedDate,
-                            completionCount12m
+                            completionCount12m,
+                            history
                         };
                     });
                     resolve(mappedData);

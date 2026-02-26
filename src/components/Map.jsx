@@ -174,7 +174,10 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     return (
         <div className="h-full w-full relative z-0">
             {/* Toggle Control */}
-            <div className="absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-1 flex">
+            <div className={cn(
+                "absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-1 flex transition-all duration-300",
+                selectedTerritory && "sm:mr-96"
+            )}>
                 <button
                     onClick={() => setViewMode('current')}
                     className={cn(

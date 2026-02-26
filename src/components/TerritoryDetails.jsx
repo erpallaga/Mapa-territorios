@@ -50,16 +50,16 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                         <DetailRow
                             icon={<User className="w-5 h-5 text-gray-400" />}
                             label="Publicador Asignado"
-                            value={territory.publisher || '-'}
+                            value={territory.status === 'free' ? '-' : (territory.publisher || '-')}
                         />
                         <DetailRow
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
                             label="Fecha de Inicio"
-                            value={territory.assignedDate || '-'}
+                            value={territory.status === 'free' ? '-' : (territory.assignedDate || '-')}
                         />
                         <DetailRow
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
-                            label="Última entrega"
+                            label="Última fecha en que se completó"
                             value={territory.lastCompletedDate || '-'}
                         />
                         <DetailRow
@@ -69,12 +69,37 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                         />
                     </div>
 
-                    {/* History Section (Placeholder) */}
+                    {/* History Section */}
                     <div className="pt-6 border-t border-gray-100">
-                        <h3 className="text-sm font-semibold text-gray-900 mb-3">Histórico</h3>
-                        <div className="text-sm text-gray-500 italic">
-                            {territory['Histórico'] || 'No hay datos históricos disponibles.'}
-                        </div>
+                        <h3 className="text-sm font-semibold text-gray-900 mb-4">Histórico de asignaciones</h3>
+                        {territory.history && territory.history.length > 0 ? (
+                            <div className="space-y-4">
+                                {territory.history.map((record, idx) => (
+                                    <div key={idx} className="flex items-start gap-3 bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                                        <User className="w-4 h-4 text-gray-400 mt-0.5 flex-shrink-0" />
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium text-gray-900 truncate">
+                                                {record.publisher}
+                                            </p>
+                                            <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span>Desde: {record.assignedDate || '-'}</span>
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <Calendar className="w-3 h-3" />
+                                                    <span>Hasta: {record.completedDate || '-'}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-gray-500 italic">
+                                No hay datos históricos disponibles.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
