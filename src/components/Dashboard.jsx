@@ -107,12 +107,22 @@ export function Dashboard({ territories }) {
                 ]
             };
 
-            const w06Pct = total > 0 ? Math.round((worked0to6.length / total) * 100) : 0;
-            const w612Pct = total > 0 ? Math.round((worked6to12.length / total) * 100) : 0;
+            const workedSlices = [];
+            if (worked0to6.length > 0) {
+                workedSlices.push({ name: `0-6 meses`, value: worked0to6.length, color: '#93c5fd' });
+            }
+            if (worked6to12.length > 0) {
+                workedSlices.push({ name: `6-12 meses`, value: worked6to12.length, color: '#1e3a8a' });
+            }
+            if (workedSlices.length > 0) {
+                workedSlices[0].groupPct = workedPct;
+                for (let i = 1; i < workedSlices.length; i++) {
+                    workedSlices[i].hideLabel = true;
+                }
+            }
 
             chartData = [
-                { name: `0-6 meses (${w06Pct}%)`, value: worked0to6.length, color: '#93c5fd' },
-                { name: `6-12 meses (${w612Pct}%)`, value: worked6to12.length, color: '#1e3a8a' },
+                ...workedSlices,
                 { name: `Asignados (${assignedPct}%)`, value: assignedTotal, color: '#f59e0b' },
                 { name: `Libres (${freePct}%)`, value: freeTotal, color: '#ef4444' },
             ].filter(d => d.value > 0); // Hide empty segments
@@ -222,7 +232,16 @@ export function Dashboard({ territories }) {
                                     outerRadius={70}
                                     paddingAngle={5}
                                     dataKey="value"
-                                    label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                                    label={(props) => {
+                                        if (props.payload.hideLabel) return '';
+                                        if (props.payload.groupPct !== undefined) return `${props.payload.groupPct}%`;
+                                        return `${(props.percent * 100).toFixed(0)}%`;
+                                    }}
+                                    labelLine={(props) => {
+                                        // Hide label line for the grouped segment
+                                        if (props.payload && props.payload.hideLabel) return false;
+                                        return true; // Use default otherwise (if Recharts supports boolean return for default)
+                                    }}
                                 >
                                     {chartData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -348,7 +367,7 @@ function ZoneCard({ zone, mode }) {
                             title="Libres"
                         ></div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-left">
                         <span className="text-xs text-gray-500">{workedPct}% Trabajado (12m)</span>
                     </div>
                 </div>
