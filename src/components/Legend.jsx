@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 
-export function Legend({ viewMode }) {
+export function Legend({ viewMode, expiredListExpanded }) {
     const items = viewMode === 'current'
         ? [
             { color: '#22c55e', label: 'Libre' },
@@ -15,24 +15,31 @@ export function Legend({ viewMode }) {
                 { color: '#ef4444', label: 'Sin trabajar (>12m)' }
             ]
             : [
-                // Expired mode
-                { color: '#fbbf24', label: '4-5 meses' },
-                { color: '#f97316', label: '5-7 meses' },
-                { color: '#ef4444', label: '7-10 meses' },
-                { color: '#991b1b', label: '>10 meses' },
-                { color: '#d1d5db', label: 'No caducado', opacity: 0.3 }
+                // Expired mode — days past the 4-month mark
+                { color: '#fbbf24', label: '< 1 mes' },
+                { color: '#f97316', label: '1-3 meses' },
+                { color: '#ef4444', label: '3-6 meses' },
+                { color: '#991b1b', label: '> 6 meses' },
+                { color: '#9ca3af', label: 'No caducado', opacity: 0.5 }
             ];
+
+    // Position logic:
+    // - current / 12months: bottom-24 on mobile (above nav), bottom-4 on desktop
+    // - expired expanded: above the full panel (~232px on desktop, bottom-24 on mobile since panel is above nav)
+    // - expired collapsed: just above the collapsed header (bottom-[120px] mobile = 64px nav + 44px header + gap, bottom-[56px] desktop)
+    const positionClass = viewMode !== 'expired'
+        ? "bottom-24 left-4 md:bottom-4 md:max-w-[200px]"
+        : expiredListExpanded
+            ? "bottom-24 left-4 md:bottom-[232px] md:max-w-[200px]"
+            : "bottom-[120px] left-4 md:bottom-[56px] md:max-w-[200px]";
 
     return (
         <div className={cn(
             "absolute z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-3 flex flex-col gap-2 w-fit max-w-[calc(100%-2rem)]",
-            // In expired mode, position above the bottom panel
-            viewMode === 'expired'
-                ? "bottom-[280px] left-4 md:bottom-[232px] md:max-w-[200px]"
-                : "bottom-24 left-4 md:bottom-4 md:max-w-[200px]"
+            positionClass
         )}>
             <h4 className="text-[10px] md:text-xs font-bold text-gray-400 md:text-gray-500 uppercase tracking-wider">
-                {viewMode === 'expired' ? 'Caducado desde' : 'Leyenda'}
+                {viewMode === 'expired' ? 'Caducado hace' : 'Leyenda'}
             </h4>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 md:flex-col md:items-start md:space-y-1.5 md:gap-x-0">
                 {items.map((item, idx) => (

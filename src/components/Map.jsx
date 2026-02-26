@@ -37,18 +37,17 @@ function MapController({ bounds, flyTo }) {
 }
 
 // Color helpers for expired mode
+// expiredDays = days PAST the 4-month threshold
 function getExpiredColor(expiredDays) {
-    const months = expiredDays / 30.44;
-    if (months < 5) return '#fbbf24';   // Amber-400 (4-5 months)
-    if (months < 7) return '#f97316';   // Orange-500 (5-7 months)
-    if (months < 10) return '#ef4444';  // Red-500 (7-10 months)
-    return '#991b1b';                    // Red-900 (10+ months)
+    if (expiredDays < 30) return '#fbbf24';   // Amber-400 (0-1 month past)
+    if (expiredDays < 90) return '#f97316';   // Orange-500 (1-3 months past)
+    if (expiredDays < 180) return '#ef4444';  // Red-500 (3-6 months past)
+    return '#991b1b';                          // Red-900 (6+ months past)
 }
 
 function getExpiredColorDot(expiredDays) {
-    const months = expiredDays / 30.44;
-    if (months < 5) return '🟡';
-    if (months < 7) return '🟠';
+    if (expiredDays < 30) return '🟡';
+    if (expiredDays < 90) return '🟠';
     return '🔴';
 }
 
@@ -56,6 +55,8 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     const [mapBounds, setMapBounds] = useState(null);
     const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
     const [flyToPos, setFlyToPos] = useState(null);
+    const [highlightedId, setHighlightedId] = useState(null);
+    const [expiredListExpanded, setExpiredListExpanded] = useState(true);
     const geoJsonRef = useRef(null);
 
     // Filter out Point features to avoid duplicate markers and badges
@@ -95,10 +96,9 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         const lastWorked = new Date(year, month - 1, day);
         const now = new Date();
 
-        // Calculate difference in months
         const diffTime = Math.abs(now - lastWorked);
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const diffMonths = diffDays / 30.44; // Average days in month
+        const diffMonths = diffDays / 30.44;
 
         return diffMonths;
     };
@@ -107,24 +107,28 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     const getColorForHistory = (months, status) => {
         if (months > 12) {
             if (status === 'assigned') {
-                return '#f59e0b'; // Amber-500
+                return '#f59e0b';
             }
-            return '#ef4444'; // Red-500
+            return '#ef4444';
         }
 
-        if (months <= 3) return '#93c5fd'; // Blue-300
-        if (months <= 6) return '#3b82f6'; // Blue-500
-        if (months <= 9) return '#1d4ed8'; // Blue-700
-        return '#1e3a8a'; // Blue-900
+        if (months <= 3) return '#93c5fd';
+        if (months <= 6) return '#3b82f6';
+        if (months <= 9) return '#1d4ed8';
+        return '#1e3a8a';
     };
 
     // Style function for polygons
     const style = (feature) => {
         const status = feature?.properties?.status;
         const lastCompletedDate = feature?.properties?.lastCompletedDate;
+        const featureId = feature?.properties?.id;
 
-        let fillColor = '#9ca3af'; // Default gray
+        let fillColor = '#9ca3af';
         let fillOpacity = 0.6;
+        let weight = 2;
+        let color = 'white';
+        let dashArray = '3';
 
         if (viewMode === 'current') {
             fillColor = status === 'free' ? '#22c55e' : '#ef4444';
@@ -142,17 +146,26 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 fillColor = getExpiredColor(expiredDays);
                 fillOpacity = 0.75;
             } else {
-                fillColor = '#d1d5db'; // Gray-300
-                fillOpacity = 0.15;
+                // Fix #3: more visible non-expired territories
+                fillColor = '#9ca3af'; // Gray-400
+                fillOpacity = 0.35;
+            }
+
+            // Fix #5: highlight selected territory from list
+            if (highlightedId && featureId === highlightedId) {
+                weight = 5;
+                color = '#1e40af'; // Blue-800 bold border
+                dashArray = '';
+                fillOpacity = 0.85;
             }
         }
 
         return {
             fillColor,
-            weight: 2,
+            weight,
             opacity: 1,
-            color: 'white',
-            dashArray: '3',
+            color,
+            dashArray,
             fillOpacity
         };
     };
@@ -186,7 +199,6 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         layer.on({
             mouseover: (e) => {
                 const layer = e.target;
-                // In expired mode, don't highlight non-expired territories
                 if (viewMode === 'expired' && !feature?.properties?.isExpired) return;
                 layer.setStyle({
                     weight: 4,
@@ -201,7 +213,6 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 layer.setStyle(style(feature));
             },
             click: () => {
-                // In expired mode, popup handles display — don't open side panel
                 if (viewMode === 'expired') return;
                 onTerritoryClick(feature?.properties);
             }
@@ -251,15 +262,37 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         });
     };
 
-    // Fly to a territory from the expired list
+    // Fly to + highlight a territory from the expired list
     const handleFlyToTerritory = useCallback((feature) => {
         const center = calculateFeatureCentroid(feature);
+        const id = feature.properties.id;
+
         if (center) {
             setFlyToPos(center);
-            // Reset after animation
+            setHighlightedId(id);
             setTimeout(() => setFlyToPos(null), 1000);
+
+            // Update GeoJSON styles to show highlight
+            if (geoJsonRef.current) {
+                geoJsonRef.current.eachLayer((layer) => {
+                    if (layer.feature) {
+                        layer.setStyle(
+                            layer.feature.properties.id === id
+                                ? { weight: 5, color: '#1e40af', dashArray: '', fillOpacity: 0.85 }
+                                : style(layer.feature)
+                        );
+                        if (layer.feature.properties.id === id) {
+                            layer.bringToFront();
+                            // Open popup if it has one
+                            if (layer.getPopup()) {
+                                setTimeout(() => layer.openPopup(), 900);
+                            }
+                        }
+                    }
+                });
+            }
         }
-    }, []);
+    }, [viewMode, highlightedId]);
 
     return (
         <div className="h-full w-full relative z-0">
@@ -338,13 +371,16 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             </MapContainer>
 
             {/* Map Legend */}
-            <Legend viewMode={viewMode} />
+            <Legend viewMode={viewMode} expiredListExpanded={expiredListExpanded} />
 
             {/* Expired List Panel */}
             {viewMode === 'expired' && (
                 <ExpiredListPanel
                     territories={expiredTerritories}
                     onItemClick={handleFlyToTerritory}
+                    highlightedId={highlightedId}
+                    expanded={expiredListExpanded}
+                    onToggleExpand={() => setExpiredListExpanded(!expiredListExpanded)}
                 />
             )}
         </div>
@@ -353,8 +389,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
 
 // ─── Expired List Panel (Bottom Sheet) ──────────────────────────────────────
 
-function ExpiredListPanel({ territories, onItemClick }) {
-    const [expanded, setExpanded] = useState(false);
+function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, onToggleExpand }) {
     const count = territories.length;
 
     if (count === 0) return null;
@@ -363,18 +398,17 @@ function ExpiredListPanel({ territories, onItemClick }) {
         <div
             className={cn(
                 "absolute left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out",
-                // Desktop: fixed height, always expanded
-                "md:bottom-0 md:max-h-[220px]",
-                // Mobile: bottom sheet behavior
+                // Fix #4: Mobile above nav bar (bottom-[64px]); Desktop at bottom-0
+                "md:bottom-0",
                 expanded
-                    ? "bottom-0 max-h-[60vh]"
-                    : "bottom-0 max-h-[52px]"
+                    ? "bottom-[64px] max-h-[50vh] md:max-h-[220px]"
+                    : "bottom-[64px] max-h-[44px] md:max-h-[44px]"
             )}
         >
-            {/* Header / Drag Handle */}
+            {/* Header / Toggle */}
             <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-between px-4 py-3 md:py-2 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                onClick={onToggleExpand}
+                className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
             >
                 <div className="flex items-center gap-2">
                     <span className="text-amber-600 text-sm">⏰</span>
@@ -398,27 +432,31 @@ function ExpiredListPanel({ territories, onItemClick }) {
                 </div>
             </button>
 
-            {/* Mobile drag handle indicator */}
-            <div className="md:hidden flex justify-center -mt-px">
-                <div className="w-10 h-1 bg-gray-300 rounded-full my-1" />
-            </div>
-
-            {/* List */}
-            <div className={cn(
-                "overflow-y-auto",
-                "md:max-h-[170px]",
-                expanded ? "max-h-[calc(60vh-52px)]" : "max-h-0 md:max-h-[170px]"
-            )}>
+            {/* List — controlled by expanded state on ALL screen sizes */}
+            <div
+                className={cn(
+                    "overflow-y-auto transition-all duration-300",
+                    expanded
+                        ? "max-h-[calc(50vh-44px)] md:max-h-[176px]"
+                        : "max-h-0"
+                )}
+            >
                 {territories.map((feature) => {
                     const props = feature.properties;
                     const days = props.expiredDays;
                     const dot = getExpiredColorDot(days);
+                    const isHighlighted = highlightedId === props.id;
 
                     return (
                         <button
                             key={props.id}
                             onClick={() => onItemClick(feature)}
-                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50 transition-colors text-left border-b border-gray-50 last:border-0 cursor-pointer"
+                            className={cn(
+                                "w-full flex items-center gap-3 px-4 py-2.5 transition-colors text-left border-b border-gray-50 last:border-0 cursor-pointer",
+                                isHighlighted
+                                    ? "bg-amber-100 border-l-4 border-l-amber-500"
+                                    : "hover:bg-amber-50"
+                            )}
                         >
                             <span className="text-sm font-bold text-gray-700 w-10 shrink-0">
                                 #{props.id}

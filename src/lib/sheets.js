@@ -90,10 +90,10 @@ export async function fetchTerritoryData(sheetUrl) {
                                 const now = new Date();
                                 const diffMs = now - assignedDateObj;
                                 const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                                const fourMonthsInDays = 4 * 30.44; // ~122 days
+                                const fourMonthsInDays = Math.round(4 * 30.44); // ~122 days
                                 if (diffDaysTotal >= fourMonthsInDays) {
                                     isExpired = true;
-                                    expiredDays = diffDaysTotal;
+                                    expiredDays = diffDaysTotal - fourMonthsInDays; // Days PAST the 4-month mark
                                 }
                             }
                         }
