@@ -25,13 +25,18 @@ export function Dashboard({ territories }) {
         const oneYearAgo = new Date();
         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-        const isRecentlyWorked = (t) => {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+        const getWorkedCategory = (t) => {
             const dateStr = t.properties.lastCompletedDate;
-            if (!dateStr) return false;
+            if (!dateStr) return null;
             const [day, month, year] = dateStr.split(/[\/\-]/).map(Number);
-            if (!day || !month || !year) return false;
+            if (!day || !month || !year) return null;
             const date = new Date(year, month - 1, day);
-            return date >= oneYearAgo;
+            if (date >= sixMonthsAgo) return '0-6';
+            if (date >= oneYearAgo) return '6-12';
+            return null;
         };
 
         // Global Stats Calculation
@@ -58,47 +63,59 @@ export function Dashboard({ territories }) {
                 { name: `Asignados (${assignedPct}%)`, value: assigned, color: '#ef4444' },
             ];
         } else {
-            // 12 Months View
-            const worked = unique.filter(isRecentlyWorked);
-            const workedIds = new Set(worked.map(t => t.properties.id));
+            // 12 Months View - Exact 4 Categories
+            const worked0to6 = [];
+            const worked6to12 = [];
+            const assignedNotWorked = [];
+            const freeNotWorked = [];
 
-            const assigned = unique.filter(t => t.properties.status === 'assigned');
-            const assignedIds = new Set(assigned.map(t => t.properties.id));
+            unique.forEach(t => {
+                const cat = getWorkedCategory(t);
+                if (cat === '0-6') {
+                    worked0to6.push(t);
+                } else if (cat === '6-12') {
+                    worked6to12.push(t);
+                } else if (t.properties.status === 'assigned') {
+                    assignedNotWorked.push(t);
+                } else {
+                    freeNotWorked.push(t);
+                }
+            });
 
-            // "Sin trabajar" = Total - (Trabajados U Asignados)
-            const workedOrAssignedCount = unique.filter(t =>
-                workedIds.has(t.properties.id) || assignedIds.has(t.properties.id)
-            ).length;
+            const workedTotal = worked0to6.length + worked6to12.length;
+            const assignedTotal = assignedNotWorked.length;
+            const freeTotal = freeNotWorked.length;
 
-            const notWorked = total - workedOrAssignedCount;
+            const workedPct = total > 0 ? Math.round((workedTotal / total) * 100) : 0;
+            const assignedPct = total > 0 ? Math.round((assignedTotal / total) * 100) : 0;
+            const freePct = total > 0 ? Math.round((freeTotal / total) * 100) : 0;
 
-            const workedPct = total > 0 ? Math.round((worked.length / total) * 100) : 0;
-            const assignedPct = total > 0 ? Math.round((assigned.length / total) * 100) : 0;
-            const notWorkedPct = total > 0 ? Math.round((notWorked / total) * 100) : 0;
+            const labelTrabajados = (
+                <div className="flex flex-col items-center">
+                    <span>Trabajados (12m)</span>
+                    <span className="text-[10px] font-normal text-gray-400 mt-0.5">
+                        (0-6m: {worked0to6.length} | 6-12m: {worked6to12.length})
+                    </span>
+                </div>
+            );
 
             globalStats = {
                 cards: [
-                    { label: 'Trabajados (12m)', value: worked.length, color: 'text-blue-600', percentage: workedPct },
-                    { label: 'Asignados actualmente', value: assigned.length, color: 'text-red-600', percentage: assignedPct },
-                    { label: 'Sin trabajar', value: notWorked, color: 'text-gray-500', percentage: notWorkedPct }
+                    { label: labelTrabajados, value: workedTotal, color: 'text-blue-600', percentage: workedPct },
+                    { label: 'Asignados (>12m)', value: assignedTotal, color: 'text-orange-500', percentage: assignedPct },
+                    { label: 'Libres (>12m o nunca)', value: freeTotal, color: 'text-red-500', percentage: freePct }
                 ]
             };
 
-            // Chart: Non-overlapping segments
-            // Priority: Trabajados -> Asignados (not worked) -> Rest (Sin trabajar)
-            const chartWorked = worked.length;
-            const chartAssignedOnly = assigned.filter(t => !workedIds.has(t.properties.id)).length;
-            const chartRest = notWorked;
-
-            const chartWorkedPct = total > 0 ? Math.round((chartWorked / total) * 100) : 0;
-            const chartAssignedOnlyPct = total > 0 ? Math.round((chartAssignedOnly / total) * 100) : 0;
-            const chartRestPct = total > 0 ? Math.round((chartRest / total) * 100) : 0;
+            const w06Pct = total > 0 ? Math.round((worked0to6.length / total) * 100) : 0;
+            const w612Pct = total > 0 ? Math.round((worked6to12.length / total) * 100) : 0;
 
             chartData = [
-                { name: `Trabajados (${chartWorkedPct}%)`, value: chartWorked, color: '#2563eb' },
-                { name: `Asignados (${chartAssignedOnlyPct}%)`, value: chartAssignedOnly, color: '#ef4444' },
-                { name: `Sin trabajar (${chartRestPct}%)`, value: chartRest, color: '#9ca3af' },
-            ];
+                { name: `0-6 meses (${w06Pct}%)`, value: worked0to6.length, color: '#93c5fd' },
+                { name: `6-12 meses (${w612Pct}%)`, value: worked6to12.length, color: '#1e3a8a' },
+                { name: `Asignados (${assignedPct}%)`, value: assignedTotal, color: '#f59e0b' },
+                { name: `Libres (${freePct}%)`, value: freeTotal, color: '#ef4444' },
+            ].filter(d => d.value > 0); // Hide empty segments
         }
 
         // Zone Stats Calculation
@@ -113,9 +130,10 @@ export function Dashboard({ territories }) {
                     free: 0,
                     assigned: 0,
                     // 12m metrics
-                    worked: 0,
-                    assignedCurrent: 0, // same as assigned, but kept for clarity in logic
-                    workedOrAssigned: 0 // to calc notWorked
+                    w06: 0,
+                    w612: 0,
+                    assigned12m: 0,
+                    free12m: 0
                 };
             }
 
@@ -129,12 +147,16 @@ export function Dashboard({ territories }) {
                 z.assignedCurrent++;
             }
 
-            // 12m
-            const worked = isRecentlyWorked(t);
-            if (worked) z.worked++;
-
-            if (worked || t.properties.status === 'assigned') {
-                z.workedOrAssigned++;
+            // 12m exact categories
+            const cat = getWorkedCategory(t);
+            if (cat === '0-6') {
+                z.w06++;
+            } else if (cat === '6-12') {
+                z.w612++;
+            } else if (t.properties.status === 'assigned') {
+                z.assigned12m++;
+            } else {
+                z.free12m++;
             }
         });
 
@@ -227,12 +249,16 @@ export function Dashboard({ territories }) {
 
 function StatCard({ label, value, color, percentage }) {
     return (
-        <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-100">
-            <p className="text-sm text-gray-500 mb-1">{label}</p>
-            <p className={`text-3xl font-bold ${color}`}>{value}</p>
-            {percentage !== undefined && (
-                <p className="text-xs text-gray-400 mt-1">{percentage}% del total</p>
-            )}
+        <div className="flex flex-col items-center justify-center text-center p-4 bg-gray-50 rounded-xl border border-gray-100 h-full">
+            <div className="mb-2 flex-grow flex items-end justify-center">
+                <span className="text-sm text-gray-500">{label}</span>
+            </div>
+            <div className="flex flex-col items-center justify-start flex-grow">
+                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+                {percentage !== undefined && (
+                    <p className="text-xs text-gray-400 mt-1">{percentage}% del total</p>
+                )}
+            </div>
         </div>
     );
 }
@@ -255,9 +281,9 @@ function ZoneCard({ zone, mode }) {
                         <span className="text-green-600 font-medium">{zone.free} Libres</span>
                     </div>
 
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div className="w-full bg-green-500 rounded-full h-2.5 overflow-hidden flex">
                         <div
-                            className="bg-red-500 h-2.5 rounded-full transition-all duration-500"
+                            className="bg-red-500 h-2.5 transition-all duration-500"
                             style={{ width: `${coverage}%` }}
                         ></div>
                     </div>
@@ -269,8 +295,8 @@ function ZoneCard({ zone, mode }) {
         );
     } else {
         // 12 Months View
-        const notWorked = zone.total - zone.workedOrAssigned;
-        const workedPct = Math.round((zone.worked / zone.total) * 100);
+        const workedTotal = zone.w06 + zone.w612;
+        const workedPct = zone.total > 0 ? Math.round((workedTotal / zone.total) * 100) : 0;
 
         return (
             <div className="p-4 border border-gray-200 rounded-xl hover:border-blue-300 transition-colors bg-gray-50/50">
@@ -283,24 +309,43 @@ function ZoneCard({ zone, mode }) {
 
                 <div className="space-y-3">
                     <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div className="bg-blue-50 p-1 rounded">
-                            <div className="font-bold text-blue-600">{zone.worked}</div>
+                        <div className="bg-blue-50 p-1 rounded flex flex-col justify-center">
+                            <div className="font-bold text-blue-600">{workedTotal}</div>
+                            <div className="text-[10px] text-blue-400">({zone.w06} | {zone.w612})</div>
                             <div className="text-gray-500">Trab.</div>
                         </div>
-                        <div className="bg-red-50 p-1 rounded">
-                            <div className="font-bold text-red-600">{zone.assignedCurrent}</div>
+                        <div className="bg-orange-50 p-1 rounded flex flex-col justify-center">
+                            <div className="font-bold text-orange-500">{zone.assigned12m}</div>
+                            <div className="text-[10px] opacity-0 text-transparent">_</div>
                             <div className="text-gray-500">Asig.</div>
                         </div>
-                        <div className="bg-gray-100 p-1 rounded">
-                            <div className="font-bold text-gray-600">{notWorked}</div>
-                            <div className="text-gray-500">Resto</div>
+                        <div className="bg-red-50 p-1 rounded flex flex-col justify-center">
+                            <div className="font-bold text-red-500">{zone.free12m}</div>
+                            <div className="text-[10px] opacity-0 text-transparent">_</div>
+                            <div className="text-gray-500">Libres</div>
                         </div>
                     </div>
 
-                    <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
                         <div
-                            className="bg-blue-500 h-2.5 rounded-full transition-all duration-500"
-                            style={{ width: `${workedPct}%` }}
+                            className="bg-blue-300 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.w06 / zone.total) * 100 : 0}%` }}
+                            title="0-6 meses"
+                        ></div>
+                        <div
+                            className="bg-blue-800 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.w612 / zone.total) * 100 : 0}%` }}
+                            title="6-12 meses"
+                        ></div>
+                        <div
+                            className="bg-orange-500 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.assigned12m / zone.total) * 100 : 0}%` }}
+                            title="Asignados"
+                        ></div>
+                        <div
+                            className="bg-red-500 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.free12m / zone.total) * 100 : 0}%` }}
+                            title="Libres"
                         ></div>
                     </div>
                     <div className="text-right">
