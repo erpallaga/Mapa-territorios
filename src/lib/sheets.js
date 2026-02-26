@@ -79,6 +79,25 @@ export async function fetchTerritoryData(sheetUrl) {
                         // Reverse history so latest assignments show up at the top
                         history.reverse();
 
+                        // Calculate expired status (>= 4 months assigned)
+                        let isExpired = false;
+                        let expiredDays = 0;
+                        if (status === 'assigned' && assignedDate && assignedDate.trim() !== '') {
+                            const [aDay, aMonth, aYear] = assignedDate.split(/[\/\-]/).map(Number);
+                            if (aDay && aMonth && aYear) {
+                                const fullYear = aYear < 100 ? aYear + 2000 : aYear;
+                                const assignedDateObj = new Date(fullYear, aMonth - 1, aDay);
+                                const now = new Date();
+                                const diffMs = now - assignedDateObj;
+                                const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                const fourMonthsInDays = 4 * 30.44; // ~122 days
+                                if (diffDaysTotal >= fourMonthsInDays) {
+                                    isExpired = true;
+                                    expiredDays = diffDaysTotal;
+                                }
+                            }
+                        }
+
                         return {
                             id,
                             zone,
@@ -87,7 +106,9 @@ export async function fetchTerritoryData(sheetUrl) {
                             assignedDate,
                             lastCompletedDate,
                             completionCount12m,
-                            history
+                            history,
+                            isExpired,
+                            expiredDays
                         };
                     });
                     resolve(mappedData);

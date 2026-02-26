@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, GeoJSON, useMap, Marker } from 'react-leaflet';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { cn } from '../lib/utils';
 import { calculateBounds, calculateFeatureCentroid } from '../lib/territories';
@@ -19,22 +19,46 @@ let DefaultIcon = L.icon({
 
 L.Marker.prototype.options.icon = DefaultIcon;
 
-function MapController({ bounds }) {
+function MapController({ bounds, flyTo }) {
     const map = useMap();
     useEffect(() => {
         if (bounds) {
             map.fitBounds(bounds, { padding: [20, 20] });
         }
     }, [bounds, map]);
+
+    useEffect(() => {
+        if (flyTo) {
+            map.flyTo(flyTo, 16, { duration: 0.8 });
+        }
+    }, [flyTo, map]);
+
     return null;
+}
+
+// Color helpers for expired mode
+function getExpiredColor(expiredDays) {
+    const months = expiredDays / 30.44;
+    if (months < 5) return '#fbbf24';   // Amber-400 (4-5 months)
+    if (months < 7) return '#f97316';   // Orange-500 (5-7 months)
+    if (months < 10) return '#ef4444';  // Red-500 (7-10 months)
+    return '#991b1b';                    // Red-900 (10+ months)
+}
+
+function getExpiredColorDot(expiredDays) {
+    const months = expiredDays / 30.44;
+    if (months < 5) return '🟡';
+    if (months < 7) return '🟠';
+    return '🔴';
 }
 
 export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     const [mapBounds, setMapBounds] = useState(null);
-    const [viewMode, setViewMode] = useState('current'); // 'current' | '12months'
+    const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
+    const [flyToPos, setFlyToPos] = useState(null);
+    const geoJsonRef = useRef(null);
 
     // Filter out Point features to avoid duplicate markers and badges
-    // We only want to render Polygons and calculate badges for them
     const filteredTerritories = useMemo(() => {
         if (!territories) return null;
         return {
@@ -44,6 +68,14 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             )
         };
     }, [territories]);
+
+    // Compute expired territories list (sorted by days desc)
+    const expiredTerritories = useMemo(() => {
+        if (!filteredTerritories) return [];
+        return filteredTerritories.features
+            .filter(f => f.properties.isExpired)
+            .sort((a, b) => b.properties.expiredDays - a.properties.expiredDays);
+    }, [filteredTerritories]);
 
     useEffect(() => {
         if (filteredTerritories) {
@@ -73,20 +105,17 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
 
     // Helper to get color for history view
     const getColorForHistory = (months, status) => {
-        // If not worked in last 12 months (months > 12)
         if (months > 12) {
             if (status === 'assigned') {
-                return '#f59e0b'; // Amber-500 for Assigned (but not worked recently)
+                return '#f59e0b'; // Amber-500
             }
-            return '#ef4444'; // Red-500 for Free (and not worked recently) - CRITICAL
+            return '#ef4444'; // Red-500
         }
 
-        // Gradient from Light Blue (recent) to Dark Blue (old)
-        // Using more distinct steps to differentiate the 4 quarters
-        if (months <= 3) return '#93c5fd'; // Blue-300 (Very Recent)
-        if (months <= 6) return '#3b82f6'; // Blue-500 (Recent)
-        if (months <= 9) return '#1d4ed8'; // Blue-700 (Older)
-        return '#1e3a8a'; // Blue-900 (Oldest within year)
+        if (months <= 3) return '#93c5fd'; // Blue-300
+        if (months <= 6) return '#3b82f6'; // Blue-500
+        if (months <= 9) return '#1d4ed8'; // Blue-700
+        return '#1e3a8a'; // Blue-900
     };
 
     // Style function for polygons
@@ -98,15 +127,23 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         let fillOpacity = 0.6;
 
         if (viewMode === 'current') {
-            fillColor = status === 'free' ? '#22c55e' : '#ef4444'; // Green-500 : Red-500
-        } else {
-            // 12 Months View
+            fillColor = status === 'free' ? '#22c55e' : '#ef4444';
+        } else if (viewMode === '12months') {
             const months = getMonthsSinceWorked(lastCompletedDate);
             fillColor = getColorForHistory(months, status);
-
-            // Adjust opacity for unworked territories to make them distinct but not overwhelming
             if (months > 12) {
                 fillOpacity = 0.7;
+            }
+        } else if (viewMode === 'expired') {
+            const isExpired = feature?.properties?.isExpired;
+            const expiredDays = feature?.properties?.expiredDays || 0;
+
+            if (isExpired) {
+                fillColor = getExpiredColor(expiredDays);
+                fillOpacity = 0.75;
+            } else {
+                fillColor = '#d1d5db'; // Gray-300
+                fillOpacity = 0.15;
             }
         }
 
@@ -120,11 +157,37 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         };
     };
 
-    // Highlight on hover
+    // Highlight on hover + click behavior
     const onEachFeature = (feature, layer) => {
+        // In expired mode, bind a Leaflet popup for expired territories
+        if (viewMode === 'expired' && feature?.properties?.isExpired) {
+            const props = feature.properties;
+            const days = props.expiredDays;
+            const dot = getExpiredColorDot(days);
+            layer.bindPopup(
+                `<div style="font-family: system-ui, sans-serif; min-width: 160px;">
+                    <div style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">
+                        Territorio ${props.id || props.name} ${dot}
+                    </div>
+                    <div style="font-size: 13px; color: #555; margin-bottom: 3px;">
+                        <strong>Publicador:</strong> ${props.publisher || '-'}
+                    </div>
+                    <div style="font-size: 13px; color: #555; margin-bottom: 3px;">
+                        <strong>Asignado:</strong> ${props.assignedDate || '-'}
+                    </div>
+                    <div style="font-size: 14px; font-weight: 600; color: ${getExpiredColor(days)}; margin-top: 6px;">
+                        ⏰ ${days} días caducado
+                    </div>
+                </div>`,
+                { className: 'expired-popup' }
+            );
+        }
+
         layer.on({
             mouseover: (e) => {
                 const layer = e.target;
+                // In expired mode, don't highlight non-expired territories
+                if (viewMode === 'expired' && !feature?.properties?.isExpired) return;
                 layer.setStyle({
                     weight: 4,
                     color: '#666',
@@ -135,10 +198,11 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             },
             mouseout: (e) => {
                 const layer = e.target;
-                // Reset style
                 layer.setStyle(style(feature));
             },
             click: () => {
+                // In expired mode, popup handles display — don't open side panel
+                if (viewMode === 'expired') return;
                 onTerritoryClick(feature?.properties);
             }
         });
@@ -146,59 +210,96 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
 
     // Calculate markers for badges
     const badgeMarkers = useMemo(() => {
-        if (viewMode !== '12months' || !filteredTerritories) return [];
+        if (!filteredTerritories) return [];
 
-        return filteredTerritories.features.map(feature => {
-            const center = calculateFeatureCentroid(feature);
-            if (!center) return null;
+        if (viewMode === '12months') {
+            return filteredTerritories.features.map(feature => {
+                const center = calculateFeatureCentroid(feature);
+                if (!center) return null;
+                const count = feature.properties.completionCount12m || 0;
+                return { position: center, label: String(count), id: feature.properties.id };
+            }).filter(Boolean);
+        }
 
-            const count = feature.properties.completionCount12m || 0;
+        if (viewMode === 'expired') {
+            return filteredTerritories.features
+                .filter(f => f.properties.isExpired)
+                .map(feature => {
+                    const center = calculateFeatureCentroid(feature);
+                    if (!center) return null;
+                    const days = feature.properties.expiredDays;
+                    return { position: center, label: `${days}d`, id: feature.properties.id };
+                }).filter(Boolean);
+        }
 
-            return {
-                position: center,
-                count: count,
-                id: feature.properties.id
-            };
-        }).filter(Boolean);
+        return [];
     }, [filteredTerritories, viewMode]);
 
-    const createBadgeIcon = (count) => {
+    const createBadgeIcon = (label) => {
+        const isExpiredBadge = viewMode === 'expired';
+        const bgColor = isExpiredBadge ? '#fef3c7' : 'white';
+        const borderColor = isExpiredBadge ? '#d97706' : '#4b5563';
+        const textColor = isExpiredBadge ? '#92400e' : '#111827';
+        const fontSize = isExpiredBadge ? '9px' : '11px';
+        const size = isExpiredBadge ? 32 : 24;
+
         return L.divIcon({
             className: 'custom-badge-icon',
-            html: `<div class="flex items-center justify-center w-6 h-6 bg-white rounded-full border-2 border-gray-600 shadow-sm text-xs font-bold text-gray-900">${count}</div>`,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+            html: `<div style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size - 6}px;background:${bgColor};border-radius:9999px;border:2px solid ${borderColor};box-shadow:0 1px 2px rgba(0,0,0,0.15);font-size:${fontSize};font-weight:700;color:${textColor};line-height:1;">${label}</div>`,
+            iconSize: [size, size - 6],
+            iconAnchor: [size / 2, (size - 6) / 2]
         });
     };
+
+    // Fly to a territory from the expired list
+    const handleFlyToTerritory = useCallback((feature) => {
+        const center = calculateFeatureCentroid(feature);
+        if (center) {
+            setFlyToPos(center);
+            // Reset after animation
+            setTimeout(() => setFlyToPos(null), 1000);
+        }
+    }, []);
 
     return (
         <div className="h-full w-full relative z-0">
             {/* Toggle Control */}
             <div className={cn(
                 "absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-1 flex transition-all duration-300",
-                selectedTerritory && "sm:mr-96"
+                selectedTerritory && viewMode !== 'expired' && "sm:mr-96"
             )}>
                 <button
                     onClick={() => setViewMode('current')}
                     className={cn(
-                        "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                        "px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-colors",
                         viewMode === 'current'
                             ? "bg-gray-900 text-white shadow-sm"
                             : "text-gray-600 hover:bg-gray-100"
                     )}
                 >
-                    Actualmente
+                    Actual
                 </button>
                 <button
                     onClick={() => setViewMode('12months')}
                     className={cn(
-                        "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                        "px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-colors",
                         viewMode === '12months'
                             ? "bg-gray-900 text-white shadow-sm"
                             : "text-gray-600 hover:bg-gray-100"
                     )}
                 >
-                    Últimos 12 meses
+                    12 meses
+                </button>
+                <button
+                    onClick={() => setViewMode('expired')}
+                    className={cn(
+                        "px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-colors",
+                        viewMode === 'expired'
+                            ? "bg-amber-600 text-white shadow-sm"
+                            : "text-gray-600 hover:bg-gray-100"
+                    )}
+                >
+                    ⏰ Caducados
                 </button>
             </div>
 
@@ -215,28 +316,124 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 />
                 {filteredTerritories && (
                     <GeoJSON
-                        key={viewMode} // Force re-render when view mode changes to update styles immediately
+                        key={viewMode}
                         data={filteredTerritories}
                         style={style}
                         onEachFeature={onEachFeature}
+                        ref={geoJsonRef}
                     />
                 )}
 
                 {/* Render Badges */}
-                {viewMode === '12months' && badgeMarkers.map((marker) => (
+                {(viewMode === '12months' || viewMode === 'expired') && badgeMarkers.map((marker) => (
                     <Marker
-                        key={marker.id}
+                        key={`${viewMode}-${marker.id}`}
                         position={marker.position}
-                        icon={createBadgeIcon(marker.count)}
-                        interactive={false} // Allow clicking through to the polygon
+                        icon={createBadgeIcon(marker.label)}
+                        interactive={false}
                     />
                 ))}
 
-                <MapController bounds={mapBounds} />
+                <MapController bounds={mapBounds} flyTo={flyToPos} />
             </MapContainer>
 
             {/* Map Legend */}
             <Legend viewMode={viewMode} />
+
+            {/* Expired List Panel */}
+            {viewMode === 'expired' && (
+                <ExpiredListPanel
+                    territories={expiredTerritories}
+                    onItemClick={handleFlyToTerritory}
+                />
+            )}
+        </div>
+    );
+}
+
+// ─── Expired List Panel (Bottom Sheet) ──────────────────────────────────────
+
+function ExpiredListPanel({ territories, onItemClick }) {
+    const [expanded, setExpanded] = useState(false);
+    const count = territories.length;
+
+    if (count === 0) return null;
+
+    return (
+        <div
+            className={cn(
+                "absolute left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out",
+                // Desktop: fixed height, always expanded
+                "md:bottom-0 md:max-h-[220px]",
+                // Mobile: bottom sheet behavior
+                expanded
+                    ? "bottom-0 max-h-[60vh]"
+                    : "bottom-0 max-h-[52px]"
+            )}
+        >
+            {/* Header / Drag Handle */}
+            <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full flex items-center justify-between px-4 py-3 md:py-2 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+            >
+                <div className="flex items-center gap-2">
+                    <span className="text-amber-600 text-sm">⏰</span>
+                    <span className="text-sm font-semibold text-gray-900">
+                        {count} territorio{count !== 1 ? 's' : ''} caducado{count !== 1 ? 's' : ''}
+                    </span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-[11px] text-gray-400 hidden sm:inline">
+                        {expanded ? 'Contraer' : 'Expandir'}
+                    </span>
+                    <svg
+                        className={cn(
+                            "w-4 h-4 text-gray-400 transition-transform duration-200",
+                            expanded ? "rotate-180" : ""
+                        )}
+                        fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                </div>
+            </button>
+
+            {/* Mobile drag handle indicator */}
+            <div className="md:hidden flex justify-center -mt-px">
+                <div className="w-10 h-1 bg-gray-300 rounded-full my-1" />
+            </div>
+
+            {/* List */}
+            <div className={cn(
+                "overflow-y-auto",
+                "md:max-h-[170px]",
+                expanded ? "max-h-[calc(60vh-52px)]" : "max-h-0 md:max-h-[170px]"
+            )}>
+                {territories.map((feature) => {
+                    const props = feature.properties;
+                    const days = props.expiredDays;
+                    const dot = getExpiredColorDot(days);
+
+                    return (
+                        <button
+                            key={props.id}
+                            onClick={() => onItemClick(feature)}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50 transition-colors text-left border-b border-gray-50 last:border-0 cursor-pointer"
+                        >
+                            <span className="text-sm font-bold text-gray-700 w-10 shrink-0">
+                                #{props.id}
+                            </span>
+                            <span className="text-sm text-gray-600 flex-1 truncate">
+                                {props.publisher || '-'}
+                            </span>
+                            <span className="text-xs font-semibold whitespace-nowrap" style={{ color: getExpiredColor(days) }}>
+                                {days} días
+                            </span>
+                            <span className="text-sm">{dot}</span>
+                        </button>
+                    );
+                })}
+            </div>
         </div>
     );
 }
