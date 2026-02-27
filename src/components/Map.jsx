@@ -437,7 +437,7 @@ function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, o
                 className={cn(
                     "overflow-y-auto transition-all duration-300",
                     expanded
-                        ? "max-h-[176px] md:max-h-[176px]"
+                        ? "max-h-[132px] md:max-h-[176px]"
                         : "max-h-0"
                 )}
             >

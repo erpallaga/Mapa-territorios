@@ -25,13 +25,13 @@ export function Legend({ viewMode, expiredListExpanded }) {
 
     // Position logic:
     // - current / 12months: bottom-20 on mobile (above panel header), bottom-4 on desktop
-    // - expired expanded: above the list (~176px) + header (~60px) + offset (~16px) + gap
-    // - expired collapsed: above the header (~60px) + offset (~16px) + gap
+    // - expired expanded: above the list (~132px) + header (~58px) + offset (~16px) + small gap
+    // - expired collapsed: above the header (~58px) + offset (~16px) + small gap
     const positionClass = viewMode !== 'expired'
         ? "bottom-20 left-4 md:bottom-4 md:max-w-[200px]"
         : expiredListExpanded
-            ? "bottom-[268px] left-4 md:bottom-[232px] md:max-w-[200px]"
-            : "bottom-[92px] left-4 md:bottom-[56px] md:max-w-[200px]";
+            ? "bottom-[208px] left-4 md:bottom-[232px] md:max-w-[200px]"
+            : "bottom-[74px] left-4 md:bottom-[56px] md:max-w-[200px]";
 
     return (
         <div className={cn(
