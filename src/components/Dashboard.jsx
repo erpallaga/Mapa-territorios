@@ -1,8 +1,23 @@
 import React, { useMemo, useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, BarChart, Bar } from 'recharts';
+
+// Expired color helpers (same as Map.jsx)
+function getExpiredColor(expiredDays) {
+    if (expiredDays < 30) return '#fbbf24';
+    if (expiredDays < 90) return '#f97316';
+    if (expiredDays < 180) return '#ef4444';
+    return '#991b1b';
+}
+
+function getExpiredBucket(expiredDays) {
+    if (expiredDays < 30) return '< 1 mes';
+    if (expiredDays < 90) return '1-3 meses';
+    if (expiredDays < 180) return '3-6 meses';
+    return '> 6 meses';
+}
 
 export function Dashboard({ territories }) {
-    const [viewMode, setViewMode] = useState('current'); // 'current' | '12months'
+    const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
 
     if (!territories) return null;
 
@@ -63,7 +78,7 @@ export function Dashboard({ territories }) {
                 { name: `Libres (${freePct}%)`, value: free, color: '#22c55e' },
                 { name: `Asignados (${assignedPct}%)`, value: assigned, color: '#ef4444' },
             ];
-        } else {
+        } else if (viewMode === '12months') {
             // 12 Months View - Exact 4 Categories
             const worked0to6 = [];
             const worked6to12 = [];
@@ -126,7 +141,7 @@ export function Dashboard({ territories }) {
                 ...workedSlices,
                 { name: `Asignados (${assignedPct}%)`, value: assignedTotal, color: '#f59e0b' },
                 { name: `Libres (${freePct}%)`, value: freeTotal, color: '#ef4444' },
-            ].filter(d => d.value > 0); // Hide empty segments
+            ].filter(d => d.value > 0);
 
             const frequencyMap = {};
             unique.forEach(t => {
@@ -140,6 +155,53 @@ export function Dashboard({ territories }) {
                 .map(count => ({
                     name: `${count} veces`,
                     territorios: frequencyMap[count]
+                }));
+        } else {
+            // ─── Expired View ───────────────────────────────────────────
+            const assigned = unique.filter(t => t.properties.status === 'assigned');
+            const assignedTotal = assigned.length;
+            const expired = assigned.filter(t => t.properties.isExpired);
+            const expiredTotal = expired.length;
+            const onTime = assignedTotal - expiredTotal;
+
+            const expiredPct = assignedTotal > 0 ? Math.round((expiredTotal / assignedTotal) * 100) : 0;
+            const onTimePct = assignedTotal > 0 ? Math.round((onTime / assignedTotal) * 100) : 0;
+
+            globalStats = {
+                cards: [
+                    { label: 'Total Asignados', value: assignedTotal, color: 'text-gray-900' },
+                    { label: 'Dentro de Plazo', value: onTime, color: 'text-slate-500', percentage: onTimePct },
+                    { label: 'Caducados', value: expiredTotal, color: 'text-amber-600', percentage: expiredPct }
+                ]
+            };
+
+            chartData = [
+                { name: `Dentro de Plazo (${onTimePct}%)`, value: onTime, color: '#94a3b8' },
+                { name: `Caducados (${expiredPct}%)`, value: expiredTotal, color: '#d97706' },
+            ].filter(d => d.value > 0);
+
+            // Frequency by expiration interval (same buckets as map legend)
+            const bucketOrder = ['< 1 mes', '1-3 meses', '3-6 meses', '> 6 meses'];
+            const bucketColors = {
+                '< 1 mes': '#fbbf24',
+                '1-3 meses': '#f97316',
+                '3-6 meses': '#ef4444',
+                '> 6 meses': '#991b1b'
+            };
+            const bucketMap = {};
+            bucketOrder.forEach(b => { bucketMap[b] = 0; });
+
+            expired.forEach(t => {
+                const bucket = getExpiredBucket(t.properties.expiredDays);
+                bucketMap[bucket]++;
+            });
+
+            frequencyData = bucketOrder
+                .filter(b => bucketMap[b] > 0)
+                .map(b => ({
+                    name: b,
+                    territorios: bucketMap[b],
+                    fill: bucketColors[b]
                 }));
         }
 
@@ -158,7 +220,11 @@ export function Dashboard({ territories }) {
                     w06: 0,
                     w612: 0,
                     assigned12m: 0,
-                    free12m: 0
+                    free12m: 0,
+                    // Expired metrics
+                    assignedCount: 0,
+                    expiredCount: 0,
+                    onTimeCount: 0
                 };
             }
 
@@ -169,7 +235,12 @@ export function Dashboard({ territories }) {
             if (t.properties.status === 'free') z.free++;
             if (t.properties.status === 'assigned') {
                 z.assigned++;
-                z.assignedCurrent++;
+                z.assignedCount++;
+                if (t.properties.isExpired) {
+                    z.expiredCount++;
+                } else {
+                    z.onTimeCount++;
+                }
             }
 
             // 12m exact categories
@@ -204,29 +275,38 @@ export function Dashboard({ territories }) {
                 <div className="bg-gray-100 p-1 rounded-lg flex">
                     <button
                         onClick={() => setViewMode('current')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'current'
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'current'
                             ? 'bg-white text-gray-900 shadow-sm'
                             : 'text-gray-500 hover:text-gray-900'
                             }`}
                     >
-                        Actualmente
+                        Actual
                     </button>
                     <button
                         onClick={() => setViewMode('12months')}
-                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${viewMode === '12months'
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${viewMode === '12months'
                             ? 'bg-white text-gray-900 shadow-sm'
                             : 'text-gray-500 hover:text-gray-900'
                             }`}
                     >
-                        Últimos 12 meses
+                        12 meses
+                    </button>
+                    <button
+                        onClick={() => setViewMode('expired')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'expired'
+                            ? 'bg-amber-600 text-white shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                    >
+                        ⏰ Caducados
                     </button>
                 </div>
             </div>
 
             {/* Global Overview */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className={`grid grid-cols-1 gap-8 ${viewMode === '12months' ? 'xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-3'}`}>
-                    <div className={`col-span-1 md:col-span-2 grid grid-cols-2 ${viewMode === 'current' ? 'md:grid-cols-3' : 'md:grid-cols-3'} gap-4`}>
+                <div className={`grid grid-cols-1 gap-8 ${(viewMode === '12months' || viewMode === 'expired') ? 'xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                    <div className={`col-span-1 md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4`}>
                         {stats.cards.map((card, idx) => (
                             <StatCard
                                 key={idx}
@@ -254,9 +334,8 @@ export function Dashboard({ territories }) {
                                         return `${(props.percent * 100).toFixed(0)}%`;
                                     }}
                                     labelLine={(props) => {
-                                        // Hide label line for the grouped segment
                                         if (props.payload && props.payload.hideLabel) return false;
-                                        return true; // Use default otherwise (if Recharts supports boolean return for default)
+                                        return true;
                                     }}
                                 >
                                     {chartData.map((entry, index) => (
@@ -267,6 +346,8 @@ export function Dashboard({ territories }) {
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
+
+                    {/* Frequency chart — 12months: area chart, expired: bar chart */}
                     {viewMode === '12months' && stats.cards?.length > 0 && (
                         <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
                             <ResponsiveContainer width="100%" height="100%">
@@ -282,6 +363,23 @@ export function Dashboard({ territories }) {
                                     <Tooltip />
                                     <Area type="monotone" dataKey="territorios" stroke="#3b82f6" fillOpacity={1} fill="url(#colorFreq)" />
                                 </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                    {viewMode === 'expired' && frequencyData.length > 0 && (
+                        <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Distribución por antigüedad</h4>
+                            <ResponsiveContainer width="100%" height="85%">
+                                <BarChart data={frequencyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                    <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
+                                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <Tooltip />
+                                    <Bar dataKey="territorios" radius={[4, 4, 0, 0]}>
+                                        {frequencyData.map((entry, idx) => (
+                                            <Cell key={idx} fill={entry.fill} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
                             </ResponsiveContainer>
                         </div>
                     )}
@@ -342,6 +440,45 @@ function ZoneCard({ zone, mode }) {
                     </div>
                     <div className="text-left">
                         <span className="text-xs text-gray-500">{coverage}% Asignado</span>
+                    </div>
+                </div>
+            </div>
+        );
+    } else if (mode === 'expired') {
+        // Expired View
+        const expiredPct = zone.assignedCount > 0 ? Math.round((zone.expiredCount / zone.assignedCount) * 100) : 0;
+        const onTimePct = zone.assignedCount > 0 ? Math.round((zone.onTimeCount / zone.assignedCount) * 100) : 0;
+
+        return (
+            <div className="p-4 border border-gray-200 rounded-xl hover:border-amber-300 transition-colors bg-gray-50/50">
+                <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-gray-900">{zone.name}</h3>
+                    <span className="text-xs font-medium bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                        {zone.assignedCount} Asig.
+                    </span>
+                </div>
+
+                <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-center text-xs">
+                        <div className="bg-slate-50 p-1.5 rounded flex flex-col justify-center">
+                            <div className="font-bold text-slate-500">{zone.onTimeCount}</div>
+                            <div className="text-gray-500">En plazo</div>
+                        </div>
+                        <div className="bg-amber-50 p-1.5 rounded flex flex-col justify-center">
+                            <div className="font-bold text-amber-600">{zone.expiredCount}</div>
+                            <div className="text-gray-500">Caducados</div>
+                        </div>
+                    </div>
+
+                    <div className="w-full bg-slate-300 rounded-full h-2.5 flex overflow-hidden">
+                        <div
+                            className="bg-amber-500 h-2.5 transition-all duration-500"
+                            style={{ width: `${expiredPct}%` }}
+                            title="Caducados"
+                        ></div>
+                    </div>
+                    <div className="text-left">
+                        <span className="text-xs text-gray-500">{expiredPct}% Caducado</span>
                     </div>
                 </div>
             </div>
