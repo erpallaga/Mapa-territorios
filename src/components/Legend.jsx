@@ -30,7 +30,7 @@ export function Legend({ viewMode, expiredListExpanded }) {
     const positionClass = viewMode !== 'expired'
         ? "bottom-[72px] left-4 md:bottom-4 md:max-w-[200px]"
         : expiredListExpanded
-            ? "bottom-[204px] left-4 md:bottom-[232px] md:max-w-[200px]"
+            ? "bottom-[202px] left-4 md:bottom-[232px] md:max-w-[200px]"
             : "bottom-[72px] left-4 md:bottom-[56px] md:max-w-[200px]";
 
     return (

@@ -408,7 +408,7 @@ function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, o
             {/* Header / Toggle */}
             <button
                 onClick={onToggleExpand}
-                className="w-full flex items-center justify-between px-4 pt-3 pb-8 md:py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                className="w-full flex items-center justify-between px-4 pt-3 pb-11 md:py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
             >
                 <div className="flex items-center gap-2">
                     <span className="text-amber-600 text-sm">⏰</span>
