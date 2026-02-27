@@ -298,7 +298,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         <div className="h-full w-full relative z-0">
             {/* Toggle Control */}
             <div className={cn(
-                "absolute top-4 right-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-1 flex transition-all duration-300",
+                "absolute top-[8px] md:top-4 right-4 z-[1000] bg-white rounded-lg shadow-md border border-gray-200 p-1 flex transition-all duration-300",
                 selectedTerritory && viewMode !== 'expired' && "sm:mr-96"
             )}>
                 <button
@@ -398,11 +398,11 @@ function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, o
         <div
             className={cn(
                 "absolute left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out",
-                // Fix #4: Mobile above nav bar (bottom-[64px]); Desktop at bottom-0
-                "md:bottom-0",
+                // Mobile and Desktop rest at bottom-0 because the mobile bottom nav was removed
+                "bottom-0",
                 expanded
-                    ? "bottom-[64px] max-h-[50vh] md:max-h-[220px]"
-                    : "bottom-[64px] max-h-[44px] md:max-h-[44px]"
+                    ? "max-h-[50vh] md:max-h-[220px]"
+                    : "max-h-[44px] md:max-h-[44px]"
             )}
         >
             {/* Header / Toggle */}

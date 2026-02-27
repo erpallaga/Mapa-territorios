@@ -65,7 +65,7 @@ function App() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 relative h-full">
+      <main className="flex-1 relative h-full pt-16 md:pt-0">
         {loading ? (
           <div className="h-full flex items-center justify-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -97,20 +97,44 @@ function App() {
         )}
       </main>
 
-      {/* Mobile Navigation (Bottom) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around p-4 z-50">
-        <NavButton
-          active={view === 'map'}
-          onClick={() => setView('map')}
-          icon={<MapIcon className="w-6 h-6" />}
-          label="Mapa"
-        />
-        <NavButton
-          active={view === 'dashboard'}
-          onClick={() => setView('dashboard')}
-          icon={<LayoutDashboard className="w-6 h-6" />}
-          label="Resumen"
-        />
+      {/* Mobile Navigation (Top Bar) */}
+      <div className="md:hidden fixed top-0 left-0 right-0 min-h-[64px] pb-2 pt-2 bg-white/75 backdrop-blur-lg border-b border-gray-200 flex items-center justify-between px-3 z-50">
+        <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+          <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-100 overflow-hidden shrink-0">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+          </div>
+          <span className="font-bold text-gray-900 text-[11px] leading-tight break-words">
+            Territorios Sarrià-Les Corts
+          </span>
+        </div>
+
+        {/* Segmented Control */}
+        <div className="flex bg-gray-100 p-1 rounded-lg">
+          <button
+            onClick={() => setView('map')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+              view === 'map'
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <MapIcon className="w-3.5 h-3.5" />
+            <span>Mapa</span>
+          </button>
+          <button
+            onClick={() => setView('dashboard')}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+              view === 'dashboard'
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            )}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>Resumen</span>
+          </button>
+        </div>
       </div>
     </div>
   )
