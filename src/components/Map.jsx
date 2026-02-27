@@ -398,8 +398,8 @@ function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, o
         <div
             className={cn(
                 "absolute left-0 right-0 z-[1000] bg-white border-t border-gray-200 shadow-[0_-4px_20px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out",
-                // Mobile and Desktop rest at bottom-0 because the mobile bottom nav was removed
-                "bottom-0",
+                // Mobile: bottom-4 to avoid browser bars; Desktop: bottom-0
+                "bottom-4 md:bottom-0",
                 expanded
                     ? "max-h-[50vh] md:max-h-[220px]"
                     : "max-h-[44px] md:max-h-[44px]"
@@ -408,7 +408,7 @@ function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, o
             {/* Header / Toggle */}
             <button
                 onClick={onToggleExpand}
-                className="w-full flex items-center justify-between px-4 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
+                className="w-full flex items-center justify-between px-4 py-4 md:py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer select-none"
             >
                 <div className="flex items-center gap-2">
                     <span className="text-amber-600 text-sm">⏰</span>
@@ -437,7 +437,7 @@ function ExpiredListPanel({ territories, onItemClick, highlightedId, expanded, o
                 className={cn(
                     "overflow-y-auto transition-all duration-300",
                     expanded
-                        ? "max-h-[calc(50vh-44px)] md:max-h-[176px]"
+                        ? "max-h-[176px] md:max-h-[176px]"
                         : "max-h-0"
                 )}
             >
