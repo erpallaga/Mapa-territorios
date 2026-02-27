@@ -28,10 +28,10 @@ export function Legend({ viewMode, expiredListExpanded }) {
     // - expired expanded: above the list (~132px) + header (~68px) + tight gap (~4px)
     // - expired collapsed: above the header (~68px) + tight gap (~4px)
     const positionClass = viewMode !== 'expired'
-        ? "bottom-[104px] left-4 md:bottom-4 md:max-w-[200px]"
+        ? "bottom-[68px] left-4 md:bottom-4 md:max-w-[200px]"
         : expiredListExpanded
-            ? "bottom-[236px] left-4 md:bottom-[232px] md:max-w-[200px]"
-            : "bottom-[104px] left-4 md:bottom-[56px] md:max-w-[200px]";
+            ? "bottom-[200px] left-4 md:bottom-[232px] md:max-w-[200px]"
+            : "bottom-[68px] left-4 md:bottom-[56px] md:max-w-[200px]";
 
     return (
         <div className={cn(
