@@ -306,7 +306,7 @@ export function Dashboard({ territories }) {
             {/* Global Overview */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
                 <div className={`grid grid-cols-1 gap-8 ${(viewMode === '12months' || viewMode === 'expired') ? 'xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-3'}`}>
-                    <div className={`col-span-1 md:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4`}>
+                    <div className={`col-span-1 md:col-span-2 grid grid-cols-3 gap-4`}>
                         {stats.cards.map((card, idx) => (
                             <StatCard
                                 key={idx}
@@ -319,13 +319,13 @@ export function Dashboard({ territories }) {
                     </div>
                     <div className="h-[200px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
+                            <PieChart margin={{ top: 0, right: 30, left: 30, bottom: 0 }}>
                                 <Pie
                                     data={chartData}
                                     cx="50%"
                                     cy="50%"
                                     innerRadius={50}
-                                    outerRadius={70}
+                                    outerRadius={65}
                                     paddingAngle={5}
                                     dataKey="value"
                                     label={(props) => {
@@ -350,7 +350,8 @@ export function Dashboard({ territories }) {
                     {/* Frequency chart — 12months: area chart, expired: bar chart */}
                     {viewMode === '12months' && stats.cards?.length > 0 && (
                         <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
-                            <ResponsiveContainer width="100%" height="100%">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Frecuencia de trabajo</h4>
+                            <ResponsiveContainer width="100%" height="85%">
                                 <AreaChart data={frequencyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorFreq" x1="0" y1="0" x2="0" y2="1">
@@ -368,7 +369,7 @@ export function Dashboard({ territories }) {
                     )}
                     {viewMode === 'expired' && frequencyData.length > 0 && (
                         <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
-                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Distribución por antigüedad</h4>
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Territorios Caducados</h4>
                             <ResponsiveContainer width="100%" height="85%">
                                 <BarChart data={frequencyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                                     <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
@@ -400,14 +401,14 @@ export function Dashboard({ territories }) {
 
 function StatCard({ label, value, color, percentage }) {
     return (
-        <div className="flex flex-col items-center justify-center text-center p-4 bg-gray-50 rounded-xl border border-gray-100 h-full">
-            <div className="mb-2 flex-grow flex items-end justify-center">
-                <span className="text-sm text-gray-500">{label}</span>
+        <div className="flex flex-col items-center justify-center text-center p-2 sm:p-4 bg-gray-50 rounded-xl border border-gray-100 h-full">
+            <div className="mb-1 sm:mb-2 flex-grow flex items-end justify-center">
+                <span className="text-[10px] sm:text-sm text-gray-500">{label}</span>
             </div>
             <div className="flex flex-col items-center justify-start flex-grow">
-                <p className={`text-3xl font-bold ${color}`}>{value}</p>
+                <p className={`text-xl sm:text-3xl font-bold ${color}`}>{value}</p>
                 {percentage !== undefined && (
-                    <p className="text-xs text-gray-400 mt-1">{percentage}% del total</p>
+                    <p className="text-[9px] sm:text-xs text-gray-400 mt-1">{percentage}% del total</p>
                 )}
             </div>
         </div>
