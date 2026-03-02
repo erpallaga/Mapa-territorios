@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, User, MapPin, Hash, History } from 'lucide-react';
+import { X, Calendar, User, MapPin, Hash, History, Home } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 export function TerritoryDetails({ territory, onClose, isOpen }) {
@@ -24,6 +24,12 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                             <MapPin className="w-4 h-4" />
                             {territory.zone || 'Sin zona especificada'}
                         </p>
+                        {territory.numViviendas && (
+                            <p className="text-gray-500 mt-1 flex items-center gap-1 text-sm">
+                                <Home className="w-4 h-4 text-gray-400" />
+                                {territory.numViviendas} Viviendas
+                            </p>
+                        )}
                     </div>
                     <button
                         onClick={onClose}

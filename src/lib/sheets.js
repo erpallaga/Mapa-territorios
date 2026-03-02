@@ -26,16 +26,18 @@ export async function fetchTerritoryData(sheetUrl) {
                         // Column indices based on fixed structure:
                         // 0: Núm. de terr.
                         // 1: Zona
-                        // 2: Estado
-                        // 3: Última fecha en que se completó*
+                        // 2: Número de viviendas (New)
+                        // 3: Estado
+                        // 4: Última fecha en que se completó*
                         const id = row[0];
                         const zone = row[1];
-                        const statusValue = (row[2] || '').trim().toUpperCase();
+                        const numViviendas = row[2];
+                        const statusValue = (row[3] || '').trim().toUpperCase();
                         const status = statusValue === 'LIBRE' ? 'free' : 'assigned';
-                        const lastCompletedDate = row[3];
+                        const lastCompletedDate = row[4];
 
                         // Find latest assignment and calculate 12-month history
-                        // Groups start at index 4. Each group is 3 columns: 
+                        // Groups start at index 5. Each group is 3 columns: 
                         // [Assignee, Date Assigned, Date Completed]
                         let publisher = '';
                         let assignedDate = '';
@@ -46,7 +48,7 @@ export async function fetchTerritoryData(sheetUrl) {
                         oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
                         // Iterate through groups of 3 columns
-                        for (let i = 4; i < row.length; i += 3) {
+                        for (let i = 5; i < row.length; i += 3) {
                             const p = row[i];
                             const d = row[i + 1];
                             const c = row[i + 2]; // Completion Date
@@ -101,6 +103,7 @@ export async function fetchTerritoryData(sheetUrl) {
                         return {
                             id,
                             zone,
+                            numViviendas,
                             status,
                             publisher,
                             assignedDate,
