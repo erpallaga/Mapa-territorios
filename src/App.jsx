@@ -11,13 +11,7 @@ import { LayoutDashboard, Map as MapIcon, ShieldCheck, LogOut } from 'lucide-rea
 import { cn } from './lib/utils'
 
 function App() {
-  // const { user, profile, loading: authLoading, signOut, isAdmin, isActive } = useAuth()
-  const user = { email: "test@test.com" };
-  const profile = { email: "test@test.com", full_name: "Test", avatar_url: "" };
-  const authLoading = false;
-  const signOut = () => { };
-  const isAdmin = true;
-  const isActive = true;
+  const { user, profile, loading: authLoading, signOut, isAdmin, isActive } = useAuth()
   const [view, setView] = useState('map'); // 'map' | 'dashboard' | 'admin'
   const [territories, setTerritories] = useState(null);
   const [selectedTerritory, setSelectedTerritory] = useState(null);
@@ -28,15 +22,21 @@ function App() {
     if (!user || !isActive) return;
 
     async function loadData() {
+      console.log("[App] loadData started");
       try {
+        console.log("[App] Fetching territories.json...");
         const geoResponse = await fetch('/data/territories.json');
         const geoJson = await geoResponse.json();
+        console.log("[App] Fetching sheet data...");
         const sheetData = await fetchTerritoryData('https://docs.google.com/spreadsheets/d/e/2PACX-1vQugwzM2d854XUSxfQBG-UXngD8bhKp-Tt72E_BEgeS80PtoQXNQg0YTFOt70iNE3s3sr2b6NSOfZoo/pub?output=csv');
+        console.log("[App] Merging data...");
         const mergedData = mergeTerritoryData(geoJson, sheetData);
         setTerritories(mergedData);
+        console.log("[App] Data loaded successfully");
       } catch (error) {
-        console.error("Failed to load data:", error);
+        console.error("[App] Failed to load data:", error);
       } finally {
+        console.log("[App] Setting app loading to false");
         setLoading(false);
       }
     }

@@ -24,38 +24,54 @@ export function AuthProvider({ children }) {
     }
 
     useEffect(() => {
-        // Check initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setUser(session?.user ?? null)
-            if (session?.user) {
-                fetchProfile(session.user.id).then(p => {
-                    setProfile(p)
-                    setLoading(false)
-                })
-            } else {
-                setLoading(false)
+        let mounted = true;
+
+        const initSession = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession()
+                if (error) throw error
+
+                setUser(session?.user ?? null)
+                if (session?.user) {
+                    const p = await fetchProfile(session.user.id)
+                    if (mounted) setProfile(p)
+                }
+            } catch (err) {
+                console.error("Auth init error:", err)
+            } finally {
+                if (mounted) setLoading(false)
             }
-        })
+        }
+
+        initSession()
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                setUser(session?.user ?? null)
-                if (session?.user) {
-                    // Small delay to let the trigger create the profile
-                    if (event === 'SIGNED_IN') {
-                        await new Promise(resolve => setTimeout(resolve, 1000))
+                try {
+                    setUser(session?.user ?? null)
+                    if (session?.user) {
+                        // Small delay to let the trigger create the profile
+                        if (event === 'SIGNED_IN') {
+                            await new Promise(resolve => setTimeout(resolve, 1000))
+                        }
+                        const p = await fetchProfile(session.user.id)
+                        if (mounted) setProfile(p)
+                    } else {
+                        if (mounted) setProfile(null)
                     }
-                    const p = await fetchProfile(session.user.id)
-                    setProfile(p)
-                } else {
-                    setProfile(null)
+                } catch (err) {
+                    console.error("Auth change error:", err)
+                } finally {
+                    if (mounted) setLoading(false)
                 }
-                setLoading(false)
             }
         )
 
-        return () => subscription.unsubscribe()
+        return () => {
+            mounted = false;
+            subscription.unsubscribe()
+        }
     }, [])
 
     async function signInWithGoogle() {

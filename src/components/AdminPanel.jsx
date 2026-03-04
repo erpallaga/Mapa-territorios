@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import {
     Users, Mail, Clock, Shield, ShieldCheck, UserX, UserCheck,
-    Send, X, RefreshCw, ChevronDown, Search, AlertCircle
+    Send, X, RefreshCw, ChevronDown, Search, AlertCircle, Trash2
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
@@ -107,6 +107,40 @@ function UsersTab() {
         }
     }
 
+    async function deleteUser(userId) {
+        if (!window.confirm('¿Estás seguro de que quieres eliminar DEFINITIVAMENTE a este usuario? Esta acción es irreversible y borrará todo su historial.')) return
+
+        try {
+            const { data: { session } } = await supabase.auth.getSession()
+
+            const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`,
+                    },
+                    body: JSON.stringify({ targetUserId: userId }),
+                }
+            )
+
+            const resultText = await response.text()
+            let result;
+            try { result = JSON.parse(resultText) } catch (e) { result = { error: resultText } }
+
+            if (!response.ok) {
+                throw new Error(`Detalle del backend: ${result.error || JSON.stringify(result)}`)
+            }
+            if (result?.error) throw new Error(result.error)
+
+            loadUsers()
+        } catch (error) {
+            console.error('Error deleting user:', error)
+            alert(`Error al eliminar usuario: ${error.message}`)
+        }
+    }
+
     const filteredUsers = users.filter(u =>
         u.email?.toLowerCase().includes(search.toLowerCase()) ||
         u.full_name?.toLowerCase().includes(search.toLowerCase())
@@ -193,6 +227,13 @@ function UsersTab() {
                                                 >
                                                     {u.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                                                 </button>
+                                                <button
+                                                    onClick={() => deleteUser(u.id)}
+                                                    className="admin-btn-sm admin-btn-deactivate"
+                                                    title="Eliminar usuario definitivamente"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                                                </button>
                                             </div>
                                         )}
                                     </td>
@@ -240,35 +281,27 @@ function InvitationsTab() {
         setMessage(null)
 
         try {
-            const { data: { session } } = await supabase.auth.getSession()
-
-            const response = await fetch(
-                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-invitation`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session.access_token}`,
-                    },
-                    body: JSON.stringify({
-                        email: email.trim(),
-                        role,
-                        siteUrl: window.location.origin,
-                    }),
+            const { data: result, error: invokeError } = await supabase.functions.invoke('send-invitation', {
+                body: {
+                    email: email.trim(),
+                    role,
+                    siteUrl: window.location.origin,
                 }
-            )
+            })
 
-            const result = await response.json()
-
-            if (response.ok) {
-                setMessage({ type: 'success', text: `Invitación enviada a ${email}` })
-                setEmail('')
-                loadInvitations()
-            } else {
-                setMessage({ type: 'error', text: result.error || 'Error al enviar invitación' })
+            if (invokeError) {
+                console.error("Function invoke error:", invokeError)
+                setMessage({ type: 'error', text: `Error del servidor: ${invokeError.message || JSON.stringify(invokeError)}` })
+                return
             }
+
+            setMessage({ type: 'success', text: `Invitación enviada a ${email}` })
+            setEmail('')
+            loadInvitations()
+
         } catch (error) {
-            setMessage({ type: 'error', text: 'Error de conexión' })
+            console.error("Catch error:", error)
+            setMessage({ type: 'error', text: `Error de conexión: ${error.message}` })
         } finally {
             setSending(false)
         }
@@ -433,6 +466,7 @@ function LogsTab() {
         role_changed: '🔄 Cambio de rol',
         user_deactivated: '🚫 Desactivado',
         user_activated: '✅ Activado',
+        user_deleted: '🗑️ Eliminado',
         invitation_created: '📧 Invitación enviada',
         invitation_revoked: '❌ Invitación revocada',
     }
