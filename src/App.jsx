@@ -22,6 +22,17 @@ function App() {
     // Only load data when user is authenticated and active
     if (!user || !isActive) return;
 
+    // Safety timeout to ensure loading is at least false after 10s
+    useEffect(() => {
+      if (loading) {
+        const timer = setTimeout(() => {
+          console.warn("[App] Loading safety timeout reached");
+          setLoading(false);
+        }, 10000);
+        return () => clearTimeout(timer);
+      }
+    }, [loading]);
+
     async function loadData() {
       console.log("[App] loadData started");
       try {

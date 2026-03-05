@@ -10,17 +10,27 @@ export function AuthProvider({ children }) {
 
     // Fetch user profile from the profiles table
     async function fetchProfile(userId) {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single()
+        // Add a safety timeout to prevent infinite hanging
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
+        });
 
-        if (error) {
-            console.error('Error fetching profile:', error)
-            return null
+        try {
+            const fetchPromise = supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            const result = await Promise.race([fetchPromise, timeoutPromise]);
+            const { data, error } = result;
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error fetching profile:', error);
+            return null;
         }
-        return data
     }
 
     useEffect(() => {
