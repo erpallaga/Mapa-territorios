@@ -60,11 +60,15 @@ function UsersTab() {
 
     async function loadUsers() {
         setLoading(true)
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
         try {
-            const { data, error } = await supabase
+            const fetchPromise = supabase
                 .from('profiles')
                 .select('*')
                 .order('created_at', { ascending: false })
+
+            const result = await Promise.race([fetchPromise, timeoutPromise])
+            const { data, error } = result
 
             if (error) throw error
             setUsers(data || [])
@@ -264,11 +268,15 @@ function InvitationsTab() {
 
     async function loadInvitations() {
         setLoading(true)
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
         try {
-            const { data, error } = await supabase
+            const fetchPromise = supabase
                 .from('invitations')
                 .select('*, inviter:invited_by(email, full_name)')
                 .order('created_at', { ascending: false })
+
+            const result = await Promise.race([fetchPromise, timeoutPromise])
+            const { data, error } = result
 
             if (error) throw error
             setInvitations(data || [])
@@ -454,12 +462,16 @@ function LogsTab() {
 
     async function loadLogs() {
         setLoading(true)
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 10000))
         try {
-            const { data, error } = await supabase
+            const fetchPromise = supabase
                 .from('audit_logs')
                 .select('*, actor:actor_id(email, full_name)')
                 .order('created_at', { ascending: false })
                 .limit(100)
+
+            const result = await Promise.race([fetchPromise, timeoutPromise])
+            const { data, error } = result
 
             if (error) throw error
             setLogs(data || [])
