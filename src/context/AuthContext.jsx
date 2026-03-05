@@ -8,81 +8,97 @@ export function AuthProvider({ children }) {
     const [profile, setProfile] = useState(null)
     const [loading, setLoading] = useState(true)
 
-    // Fetch user profile from the profiles table
-    async function fetchProfile(userId) {
-        // Add a safety timeout to prevent infinite hanging
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Profile fetch timeout')), 10000)
-        });
+    // Fetch user profile from the profiles table with retry and backoff
+    async function fetchProfile(userId, retries = 3, delay = 500) {
+        for (let i = 0; i < retries; i++) {
+            const timeoutPromise = new Promise((_, reject) => {
+                const timer = setTimeout(() => reject(new Error('Timeout')), 5000); // 5s timeout per attempt
+                return () => clearTimeout(timer);
+            });
 
-        try {
-            const fetchPromise = supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', userId)
-                .single();
+            try {
+                const fetchPromise = supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
 
-            const result = await Promise.race([fetchPromise, timeoutPromise]);
-            const { data, error } = result;
+                const result = await Promise.race([fetchPromise, timeoutPromise]);
+                // result will be { data, error } from fetchPromise or error from timeoutPromise
+                const { data, error } = result;
 
-            if (error) throw error;
-            return data;
-        } catch (error) {
-            console.error('Error fetching profile:', error);
-            return null;
+                if (error) {
+                    // PGRST116 is "JSON object requested, but no rows returned"
+                    if (error.code === 'PGRST116' && i < retries - 1) {
+                        console.log(`[Auth] Profile not found, retrying (${i + 1}/${retries})...`);
+                        await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+                        continue;
+                    }
+                    throw error;
+                }
+                return data;
+            } catch (error) {
+                console.error(`[Auth] Profile fetch attempt ${i + 1} failed:`, error.message);
+                if (i === retries - 1) return null;
+                await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+            }
         }
+        return null;
     }
 
     useEffect(() => {
         let mounted = true;
+        let authListener = null;
 
-        const initSession = async () => {
-            try {
-                const { data: { session }, error } = await supabase.auth.getSession()
-                if (error) throw error
+        const handleAuthChange = async (event, session) => {
+            if (!mounted) return;
 
-                setUser(session?.user ?? null)
-                if (session?.user) {
-                    const p = await fetchProfile(session.user.id)
-                    if (mounted) setProfile(p)
-                }
-            } catch (err) {
-                console.error("Auth init error:", err)
-            } finally {
-                if (mounted) setLoading(false)
-            }
-        }
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
 
-        initSession()
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
+            if (currentUser) {
+                // Fetch profile if we have a user
                 try {
-                    setUser(session?.user ?? null)
-                    if (session?.user) {
-                        // Small delay to let the trigger create the profile
-                        if (event === 'SIGNED_IN') {
-                            await new Promise(resolve => setTimeout(resolve, 1000))
-                        }
-                        const p = await fetchProfile(session.user.id)
-                        if (mounted) setProfile(p)
-                    } else {
-                        if (mounted) setProfile(null)
+                    // Small delay to let the trigger create the profile for new users
+                    if (event === 'SIGNED_IN') {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+
+                    const p = await fetchProfile(currentUser.id);
+                    if (mounted) {
+                        setProfile(p);
+                        setLoading(false);
                     }
                 } catch (err) {
-                    console.error("Auth change error:", err)
-                } finally {
-                    if (mounted) setLoading(false)
+                    console.error("Profile load error:", err);
+                    if (mounted) setLoading(false);
+                }
+            } else {
+                if (mounted) {
+                    setProfile(null);
+                    setLoading(false);
                 }
             }
-        )
+        };
+
+        // Initialize session and set up listener
+        const init = async () => {
+            // 1. Get initial session
+            const { data: { session } } = await supabase.auth.getSession();
+            await handleAuthChange('INITIAL', session);
+
+            // 2. Listen for future changes
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+            authListener = subscription;
+        };
+
+        init();
 
         return () => {
             mounted = false;
-            subscription.unsubscribe()
-        }
-    }, [])
+            if (authListener) authListener.unsubscribe();
+        };
+    }, []);
 
     async function signInWithGoogle() {
         const { error } = await supabase.auth.signInWithOAuth({
