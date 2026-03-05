@@ -66,7 +66,15 @@ export function AuthProvider({ children }) {
 
                     const p = await fetchProfile(currentUser.id);
                     if (mounted) {
-                        setProfile(p);
+                        if (p) {
+                            setProfile(p);
+                        } else if (!profile) {
+                            // Only set to null if we don't have a profile yet (initial load failure)
+                            setProfile(null);
+                        } else {
+                            // If we already have a profile and fetch failed, KEEP the old one
+                            console.warn("[Auth] Profile re-fetch failed, preserving current session to avoid lockout.");
+                        }
                         setLoading(false);
                     }
                 } catch (err) {
