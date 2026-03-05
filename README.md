@@ -1,61 +1,66 @@
-# Mapa Territorios
+# Mapa Territorios 🗺️
 
-A web application to visualize and manage territory assignments on an interactive map.
+Aplicación web avanzada para la visualización y gestión de asignación de territorios sobre un mapa interactivo, protegida mediante autenticación corporativa y con panel de administración integral.
 
-## Features
+## 🚀 Características Principales
 
-- **Interactive Map**: Visualize territories using KML/KMZ data.
-- **Status Tracking**: Color-coded territories (Green for Free, Red for Assigned).
-- **Dashboard**: View statistics on territory assignments.
-- **Search**: Find territories by name or number.
+- **Mapa Interactivo Premium**: Visualización de territorios mediante datos KML/KMZ con renderizado optimizado.
+- **Estado en Tiempo Real**: Código de colores dinámico (Verde: Libre, Rojo: Asignado) sincronizado con Google Sheets.
+- **Dashboard de Estadísticas**: Análisis visual de la cobertura y antigüedad de los territorios.
+- **Autenticación Google OAuth**: Acceso exclusivo para usuarios invitados mediante sus cuentas de Google.
+- **Panel de Administración**: 
+  - Gestión de usuarios y roles (Admin/User).
+  - Sistema de invitaciones por email automatizado.
+  - Auditoría completa de acciones administrativas (Logs).
+  - Eliminación segura de cuentas con limpieza en cascada.
 
-## Getting Started
+## 🛠️ Stack Tecnológico
 
-### Prerequisites
+- **Frontend**: [React](https://reactjs.org/) + [Vite](https://vitejs.dev/)
+- **Gestión de Estado**: Context API con optimización de renderizado y persistencia de sesión.
+- **Mapas**: [Leaflet](https://leafletjs.com/) / React-Leaflet.
+- **Estilos**: [Tailwind CSS](https://tailwindcss.com/) con diseño responsivo y premium.
+- **Backend / BaaS**: [Supabase](https://supabase.com/)
+  - **Auth**: Google OAuth 2.0.
+  - **Database**: PostgreSQL con RLS (Row Level Security) avanzado.
+  - **Edge Functions**: TypeScript (Deno) para envío de invitaciones y gestión segura de usuarios.
 
-- Node.js (v16 or higher)
-- npm
+## ⚙️ Arquitectura Técnica y Optimizaciones
 
-### Installation
+### 1. Robustez en la Autenticación (`AuthContext`)
+Se ha implementado una capa de seguridad y estabilidad superior para evitar los bloqueos típicos de aplicaciones web en entornos móviles:
+- **Retry Mechanism**: Lógica de reintentos con *exponential backoff* para la obtención del perfil de usuario, manejando latencias de disparadores (triggers) de base de datos.
+- **Functional State Updates**: Resolución del bug de *stale closures* (cierres obsoletos) asegurando que los refrescos de sesión en segundo plano no provoquen "lockouts" accidentales.
+- **Safety Timeouts**: Timeouts técnicos de 10s para garantizar que la UI nunca se quede en un estado de carga infinito.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/erpallaga/Mapa-territorios.git
+### 2. Rendimiento de Base de Datos
+- **RLS Optimizado**: Las políticas de seguridad utilizan una función `is_admin()` con `SECURITY DEFINER` y `search_path` fijo para maximizar la velocidad y evitar recursividad en consultas complejas.
+- **Memoización**: El contexto de autenticación está memoizado para evitar re-renderizados innecesarios del mapa y del dashboard durante actualizaciones de sesión.
+
+## 💻 Instalación y Configuración
+
+### Prerrequisitos
+- Node.js (v18+)
+- Cuenta de Supabase con Google OAuth configurado.
+
+### Configuración de Pasos
+1. Clona el repositorio.
+2. Instala dependencias: `npm install`
+3. Configura las variables de entorno en un archivo `.env`:
+   ```env
+   VITE_SUPABASE_URL=tu_url_supabase
+   VITE_SUPABASE_ANON_KEY=tu_anon_key
    ```
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+4. Inicia el servidor de desarrollo: `npm run dev`
 
-### Running Locally
+## 📦 Despliegue (Vercel)
 
-Start the development server:
+El proyecto está configurado para despliegue continuo en Vercel. El script de `build` procesa automáticamente los archivos KML a JSON antes de generar el paquete estático.
 
-```bash
-npm run dev
-```
+### Actualización de Datos del Mapa
+1. Añade o reemplaza archivos KML en el directorio `/kmlfiles`.
+2. Sube los cambios a GitHub.
+3. Vercel reconstruirá el sitio automáticamente con los nuevos polígonos.
 
-## Technologies
-
-- React
-- Vite
-- Leaflet / React-Leaflet
-- Tailwind CSS
-
-## Deployment
-
-This project is configured for static deployment on Vercel.
-
-### How it works
-The `build` script is configured to automatically process KML files into JSON before building the application. This means you don't need to manually run the conversion script.
-
-### Steps to Deploy
-1. Push your code to GitHub.
-2. Import the project into Vercel.
-3. Vercel will detect the Vite settings and deploy automatically.
-
-### Updating the Map
-To update the territories:
-1. Add or replace KML files in the `kmlfiles` directory.
-2. Commit and push the changes to GitHub.
-3. Vercel will automatically rebuild and deploy the site with the new data.
+---
+**Mapa Territorios** - Desarrollado con foco en seguridad, fluidez y experiencia de usuario premium.
