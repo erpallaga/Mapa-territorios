@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -9,10 +9,10 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true)
 
     // Fetch user profile from the profiles table with retry and backoff
-    async function fetchProfile(userId, retries = 3, delay = 500) {
+    const fetchProfile = useCallback(async (userId, retries = 3, delay = 1000) => {
         for (let i = 0; i < retries; i++) {
             const timeoutPromise = new Promise((_, reject) => {
-                const timer = setTimeout(() => reject(new Error('Timeout')), 5000); // 5s timeout per attempt
+                const timer = setTimeout(() => reject(new Error('Timeout')), 10000); // 10s timeout per attempt
                 return () => clearTimeout(timer);
             });
 
@@ -24,7 +24,6 @@ export function AuthProvider({ children }) {
                     .single();
 
                 const result = await Promise.race([fetchPromise, timeoutPromise]);
-                // result will be { data, error } from fetchPromise or error from timeoutPromise
                 const { data, error } = result;
 
                 if (error) {
@@ -44,7 +43,7 @@ export function AuthProvider({ children }) {
             }
         }
         return null;
-    }
+    }, []);
 
     useEffect(() => {
         let mounted = true;
@@ -57,7 +56,6 @@ export function AuthProvider({ children }) {
             setUser(currentUser);
 
             if (currentUser) {
-                // Fetch profile if we have a user
                 try {
                     // Small delay to let the trigger create the profile for new users
                     if (event === 'SIGNED_IN') {
@@ -65,16 +63,18 @@ export function AuthProvider({ children }) {
                     }
 
                     const p = await fetchProfile(currentUser.id);
+
                     if (mounted) {
-                        if (p) {
-                            setProfile(p);
-                        } else if (!profile) {
-                            // Only set to null if we don't have a profile yet (initial load failure)
-                            setProfile(null);
-                        } else {
-                            // If we already have a profile and fetch failed, KEEP the old one
-                            console.warn("[Auth] Profile re-fetch failed, preserving current session to avoid lockout.");
-                        }
+                        setProfile(prevProfile => {
+                            if (p) return p;
+                            // If we already have a profile and fetch failed (null), KEEP the old one
+                            // This prevents intermittent network errors from kicking users out
+                            if (prevProfile) {
+                                console.warn("[Auth] Profile re-fetch failed, preserving current session to avoid lockout.");
+                                return prevProfile;
+                            }
+                            return null;
+                        });
                         setLoading(false);
                     }
                 } catch (err) {
@@ -89,15 +89,14 @@ export function AuthProvider({ children }) {
             }
         };
 
-        // Initialize session and set up listener
         const init = async () => {
-            // 1. Get initial session
             const { data: { session } } = await supabase.auth.getSession();
             await handleAuthChange('INITIAL', session);
 
-            // 2. Listen for future changes
-            const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
-            authListener = subscription;
+            if (mounted) {
+                const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+                authListener = subscription;
+            }
         };
 
         init();
@@ -106,9 +105,9 @@ export function AuthProvider({ children }) {
             mounted = false;
             if (authListener) authListener.unsubscribe();
         };
-    }, []);
+    }, [fetchProfile]);
 
-    async function signInWithGoogle() {
+    const signInWithGoogle = useCallback(async () => {
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
@@ -119,10 +118,9 @@ export function AuthProvider({ children }) {
             console.error('Error signing in with Google:', error)
             throw error
         }
-    }
+    }, []);
 
-    async function signOut() {
-        // Log the logout
+    const signOut = useCallback(async () => {
         if (user && profile) {
             await supabase.from('audit_logs').insert({
                 actor_id: user.id,
@@ -132,17 +130,16 @@ export function AuthProvider({ children }) {
         }
         const { error } = await supabase.auth.signOut()
         if (error) console.error('Error signing out:', error)
-    }
+    }, [user, profile]);
 
-    // Refresh profile data (useful after admin changes)
-    async function refreshProfile() {
+    const refreshProfile = useCallback(async () => {
         if (user) {
             const p = await fetchProfile(user.id)
-            setProfile(p)
+            if (p) setProfile(p)
         }
-    }
+    }, [user, fetchProfile]);
 
-    const value = {
+    const value = useMemo(() => ({
         user,
         profile,
         loading,
@@ -151,7 +148,7 @@ export function AuthProvider({ children }) {
         refreshProfile,
         isAdmin: profile?.role === 'admin',
         isActive: profile?.is_active === true,
-    }
+    }), [user, profile, loading, signInWithGoogle, signOut, refreshProfile]);
 
     return (
         <AuthContext.Provider value={value}>

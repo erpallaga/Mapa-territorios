@@ -31,7 +31,7 @@ function App() {
 
   useEffect(() => {
     // Only load data when user is authenticated and active
-    if (!user || !isActive) return;
+    if (!user?.id || !isActive) return;
 
     async function loadData() {
       console.log("[App] loadData started");
@@ -54,7 +54,7 @@ function App() {
     }
 
     loadData();
-  }, [user, isActive]);
+  }, [user?.id, isActive]);
 
   const handleTerritoryClick = (territory) => {
     setSelectedTerritory(territory);
