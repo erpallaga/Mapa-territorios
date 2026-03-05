@@ -282,7 +282,9 @@ function InvitationsTab() {
                 body: {
                     email: email.trim(),
                     role,
-                    siteUrl: window.location.origin,
+                    siteUrl: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+                        ? 'https://mapa-territorios-pi.vercel.app'
+                        : window.location.origin,
                 }
             })
 
