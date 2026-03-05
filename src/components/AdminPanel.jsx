@@ -60,14 +60,19 @@ function UsersTab() {
 
     async function loadUsers() {
         setLoading(true)
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .order('created_at', { ascending: false })
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .order('created_at', { ascending: false })
 
-        if (error) console.error('Error loading users:', error)
-        setUsers(data || [])
-        setLoading(false)
+            if (error) throw error
+            setUsers(data || [])
+        } catch (error) {
+            console.error('Error loading users:', error)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => { loadUsers() }, [])
@@ -259,14 +264,19 @@ function InvitationsTab() {
 
     async function loadInvitations() {
         setLoading(true)
-        const { data, error } = await supabase
-            .from('invitations')
-            .select('*, inviter:invited_by(email, full_name)')
-            .order('created_at', { ascending: false })
+        try {
+            const { data, error } = await supabase
+                .from('invitations')
+                .select('*, inviter:invited_by(email, full_name)')
+                .order('created_at', { ascending: false })
 
-        if (error) console.error('Error loading invitations:', error)
-        setInvitations(data || [])
-        setLoading(false)
+            if (error) throw error
+            setInvitations(data || [])
+        } catch (error) {
+            console.error('Error loading invitations:', error)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => { loadInvitations() }, [])
@@ -446,15 +456,20 @@ function LogsTab() {
 
     async function loadLogs() {
         setLoading(true)
-        const { data, error } = await supabase
-            .from('audit_logs')
-            .select('*, actor:actor_id(email, full_name)')
-            .order('created_at', { ascending: false })
-            .limit(100)
+        try {
+            const { data, error } = await supabase
+                .from('audit_logs')
+                .select('*, actor:actor_id(email, full_name)')
+                .order('created_at', { ascending: false })
+                .limit(100)
 
-        if (error) console.error('Error loading logs:', error)
-        setLogs(data || [])
-        setLoading(false)
+            if (error) throw error
+            setLogs(data || [])
+        } catch (error) {
+            console.error('Error loading logs:', error)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => { loadLogs() }, [])
