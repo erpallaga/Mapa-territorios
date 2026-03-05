@@ -6,6 +6,7 @@ import {
     Send, X, RefreshCw, ChevronDown, Search, AlertCircle, Trash2
 } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { UserAvatar } from './UserAvatar'
 
 export function AdminPanel() {
     const [activeTab, setActiveTab] = useState('users')
@@ -185,11 +186,7 @@ function UsersTab() {
                                 <tr key={u.id}>
                                     <td>
                                         <div className="admin-user-cell">
-                                            <img
-                                                src={u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.full_name || u.email)}&background=6366f1&color=fff`}
-                                                alt=""
-                                                className="admin-avatar"
-                                            />
+                                            <UserAvatar user={u} className="admin-avatar" />
                                             <div>
                                                 <div className="admin-user-name">{u.full_name || 'Sin nombre'}</div>
                                                 <div className="admin-user-email">{u.email}</div>

@@ -9,6 +9,7 @@ import { fetchTerritoryData } from './lib/sheets'
 import { mergeTerritoryData } from './lib/territories'
 import { LayoutDashboard, Map as MapIcon, ShieldCheck, LogOut } from 'lucide-react'
 import { cn } from './lib/utils'
+import { UserAvatar } from './components/UserAvatar'
 
 function App() {
   const { user, profile, loading: authLoading, signOut, isAdmin, isActive } = useAuth()
@@ -101,12 +102,7 @@ function App() {
 
         {/* User menu at bottom */}
         <div className="user-menu">
-          <img
-            src={profile?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile?.full_name || profile?.email || '')}&background=6366f1&color=fff&size=36`}
-            alt="Avatar"
-            className="user-menu-avatar"
-            title={profile?.email}
-          />
+          <UserAvatar user={profile || user} className="user-menu-avatar w-9 h-9 text-sm" />
           <button
             onClick={signOut}
             className="p-2 rounded-xl text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-all duration-200"
