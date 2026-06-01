@@ -12,7 +12,9 @@ export function Legend({ viewMode, expiredListExpanded }) {
                 { color: '#93c5fd', label: '0-6 meses' },
                 { color: '#1e3a8a', label: '6-12 meses' },
                 { color: '#f59e0b', label: 'Asignado (>12m)' },
-                { color: '#ef4444', label: 'Sin trabajar (>12m)' }
+                { color: '#ef4444', label: 'Sin trabajar (>12m)' },
+                { color: '#16a34a', label: 'Contorno libre', isOutline: true },
+                { color: '#dc2626', label: 'Contorno asignado', isOutline: true }
             ]
             : [
                 // Expired mode — days past the 4-month mark
@@ -47,7 +49,9 @@ export function Legend({ viewMode, expiredListExpanded }) {
                         <div
                             className="w-3.5 h-3.5 md:w-4 md:h-4 rounded-sm border border-black/10 flex-shrink-0"
                             style={{
-                                backgroundColor: item.color,
+                                backgroundColor: item.isOutline ? 'white' : item.color,
+                                borderColor: item.isOutline ? item.color : 'rgba(0,0,0,0.1)',
+                                borderWidth: item.isOutline ? 2 : 1,
                                 opacity: item.opacity || 1
                             }}
                         />

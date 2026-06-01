@@ -135,6 +135,9 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         } else if (viewMode === '12months') {
             const months = getMonthsSinceWorked(lastCompletedDate);
             fillColor = getColorForHistory(months, status);
+            color = status === 'free' ? '#16a34a' : '#dc2626';
+            weight = 3;
+            dashArray = '';
             if (months > 12) {
                 fillOpacity = 0.7;
             }
@@ -202,7 +205,9 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 if (viewMode === 'expired' && !feature?.properties?.isExpired) return;
                 layer.setStyle({
                     weight: 4,
-                    color: '#666',
+                    color: viewMode === '12months'
+                        ? (feature?.properties?.status === 'free' ? '#16a34a' : '#dc2626')
+                        : '#666',
                     dashArray: '',
                     fillOpacity: 0.8
                 });
