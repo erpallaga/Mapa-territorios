@@ -151,17 +151,16 @@ function App() {
             )}
             {view === 'dashboard' && (
               <div className="h-full p-8 overflow-y-auto">
-                <div className="max-w-5xl mx-auto">
-                  <AskTerritorios />
-                  <div className="h-[600px]">
-                    <Dashboard territories={territories?.features} />
-                  </div>
+                <div className="max-w-5xl mx-auto h-[600px]">
+                  <Dashboard territories={territories?.features} />
                 </div>
               </div>
             )}
           </>
         )}
       </main>
+
+      <AskTerritorios />
 
       {/* Mobile Navigation (Top Bar) */}
       <div className="md:hidden fixed top-0 left-0 right-0 min-h-[64px] pb-2 pt-2 bg-white/75 backdrop-blur-lg border-b border-gray-200 flex items-center justify-between px-3 z-50">

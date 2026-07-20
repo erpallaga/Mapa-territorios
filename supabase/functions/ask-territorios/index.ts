@@ -11,6 +11,8 @@ const corsHeaders = {
 // territorios a través de las tools del servidor MCP remoto (ver api/mcp.js).
 const MODEL = 'claude-haiku-4-5';
 const MCP_BETA_HEADER = 'mcp-client-2025-11-20';
+const MAX_MESSAGES = 20;
+const MAX_TOTAL_CHARS = 12000;
 const SYSTEM_PROMPT = 'Respondes preguntas sobre el estado de los territorios de predicación ' +
     '(libre/asignado, vencidos, zonas, historial) usando exclusivamente las tools disponibles. ' +
     'Responde siempre en español, de forma breve y concreta. No inventes datos que no obtengas de las tools.';
@@ -59,15 +61,39 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        const { question } = await req.json();
-        if (!question || typeof question !== 'string' || question.trim() === '') {
-            return new Response(JSON.stringify({ error: 'question is required' }), {
+        const { messages } = await req.json();
+
+        if (!Array.isArray(messages) || messages.length === 0) {
+            return new Response(JSON.stringify({ error: 'messages array is required' }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
         }
-        if (question.length > 2000) {
-            return new Response(JSON.stringify({ error: 'question is too long (max 2000 characters)' }), {
+        if (messages.length > MAX_MESSAGES) {
+            return new Response(JSON.stringify({ error: `too many messages (max ${MAX_MESSAGES})` }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
+        let totalChars = 0;
+        for (const m of messages) {
+            if (!m || (m.role !== 'user' && m.role !== 'assistant') || typeof m.content !== 'string' || m.content.trim() === '') {
+                return new Response(JSON.stringify({ error: 'each message needs a role (user|assistant) and non-empty content' }), {
+                    status: 400,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+            }
+            totalChars += m.content.length;
+        }
+        if (totalChars > MAX_TOTAL_CHARS) {
+            return new Response(JSON.stringify({ error: `conversation is too long (max ${MAX_TOTAL_CHARS} characters total)` }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        if (messages[messages.length - 1].role !== 'user') {
+            return new Response(JSON.stringify({ error: 'the last message must be from the user' }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
@@ -99,7 +125,10 @@ Deno.serve(async (req: Request) => {
                     authorization_token: mcpSharedSecret,
                 }],
                 tools: [{ type: 'mcp_toolset', mcp_server_name: 'territorios' }],
-                messages: [{ role: 'user', content: question.trim() }],
+                messages: messages.map((m: { role: string; content: string }) => ({
+                    role: m.role,
+                    content: m.content.trim(),
+                })),
             }),
         });
 

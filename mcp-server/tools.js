@@ -241,4 +241,91 @@ Devuelve: total, libres, asignados, vencidos (números globales), y porZona (arr
       return { content: [{ type: "text", text: lines.join("\n") }], structuredContent: output };
     }
   );
+
+  const PublisherInputSchema = z.object({
+    publicador: z.string().min(1).describe("Nombre (o parte del nombre) del publicador a buscar, sin distinguir mayúsculas"),
+    soloActuales: z.boolean().default(true)
+      .describe("Si es true (por defecto), solo territorios actualmente asignados a este publicador. Si es false, incluye también coincidencias en el historial de asignaciones pasadas."),
+    limit: z.number().int().min(1).max(100).default(50).describe("Máximo de resultados a devolver (1-100)"),
+    offset: z.number().int().min(0).default(0).describe("Número de resultados a saltar, para paginación")
+  }).strict();
+
+  server.registerTool(
+    "territorios_buscar_por_publicador",
+    {
+      title: "Buscar Territorios por Publicador",
+      description: `Busca territorios asociados a un publicador por nombre, sin necesidad de acotar por zona.
+Solo lectura.
+
+Args:
+  - publicador (string): nombre o parte del nombre del publicador (coincidencia parcial, sin distinguir mayúsculas).
+  - soloActuales (boolean): si true (por defecto), solo la asignación actual de ese publicador. Si false, también busca en el historial de asignaciones pasadas.
+  - limit (number): máximo de resultados (1-100, por defecto 50).
+  - offset (number): resultados a saltar para paginación.
+
+Devuelve por cada coincidencia: id de territorio, zona, si es asignación actual o histórica,
+fecha de asignación (y de finalización si es histórica), y si está vencido (solo para asignaciones actuales).`,
+      inputSchema: PublisherInputSchema,
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+    },
+    async ({ publicador, soloActuales, limit, offset }) => {
+      const all = await getTerritories();
+      const needle = publicador.toLowerCase();
+      const matches = [];
+
+      for (const t of all) {
+        if (soloActuales) {
+          if (t.publisher && t.publisher.toLowerCase().includes(needle)) {
+            matches.push({
+              id: t.id,
+              zona: t.zone,
+              estado: t.status === "free" ? "libre" : "asignado",
+              publicador: t.publisher,
+              fechaAsignacion: t.assignedDate || null,
+              vencido: t.isExpired,
+              diasVencido: t.isExpired ? t.expiredDays : null,
+              tipo: "actual"
+            });
+          }
+        } else {
+          t.history.forEach((h, idx) => {
+            if (h.publisher && h.publisher.toLowerCase().includes(needle)) {
+              matches.push({
+                id: t.id,
+                zona: t.zone,
+                publicador: h.publisher,
+                fechaAsignacion: h.assignedDate || null,
+                fechaCompletado: h.completedDate || null,
+                tipo: idx === 0 && t.status === "assigned" ? "actual" : "historico"
+              });
+            }
+          });
+        }
+      }
+
+      const total = matches.length;
+      const page = matches.slice(offset, offset + limit);
+
+      const output = {
+        total,
+        count: page.length,
+        offset,
+        coincidencias: page,
+        has_more: total > offset + page.length,
+        ...(total > offset + page.length ? { next_offset: offset + page.length } : {})
+      };
+
+      const lines = [`# Territorios de "${publicador}" (${total} encontrados, mostrando ${page.length})`, ""];
+      for (const m of page) {
+        const marca = m.tipo === "historico" ? " (histórico)" : m.vencido ? ` ⚠️ vencido (${m.diasVencido} días)` : "";
+        const fechas = m.fechaCompletado
+          ? `asignado ${m.fechaAsignacion}, completado ${m.fechaCompletado}`
+          : `asignado ${m.fechaAsignacion}`;
+        lines.push(`- **Territorio ${m.id}** (${m.zona || "sin zona"}): ${fechas}${marca}`);
+      }
+      if (page.length === 0) lines.push(`Ningún territorio encontrado para "${publicador}".`);
+
+      return { content: [{ type: "text", text: lines.join("\n") }], structuredContent: output };
+    }
+  );
 }
