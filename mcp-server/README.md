@@ -2,6 +2,12 @@
 
 Servidor MCP (Model Context Protocol) de solo lectura para consultar el estado de los territorios y zonas en lenguaje natural, reutilizando `fetchTerritoryData` de `src/lib/sheets.js`.
 
+## Archivos
+
+- `data.js` — trae y cachea (60s) los datos del Sheet.
+- `tools.js` — define las 4 tools (`registerTerritorioTools(server)`), compartidas entre el entry point local (`index.js`, stdio) y el endpoint remoto en Vercel (`api/mcp.js`, HTTP).
+- `index.js` — entry point local, transporte stdio.
+
 ## Instalación
 
 ```bash
@@ -36,6 +42,19 @@ Añade esta entrada a `claude_desktop_config.json`:
 }
 ```
 
+## Probar con MCP Inspector
+
+```bash
+npx @modelcontextprotocol/inspector node mcp-server/index.js
+```
+
+## Versión remota (Vercel)
+
+El mismo conjunto de tools se expone también por HTTP en `api/mcp.js`, para que la Edge
+Function `supabase/functions/ask-territorios` (y cualquier otro cliente MCP remoto) pueda
+usarlo. Ver el `README.md` de la raíz del proyecto para las variables de entorno necesarias
+(`MCP_SHARED_SECRET`, `ANTHROPIC_API_KEY`, etc.).
+
 ## Tools disponibles
 
 | Tool | Descripción |
@@ -47,6 +66,6 @@ Añade esta entrada a `claude_desktop_config.json`:
 
 ## Notas técnicas
 
-- Transporte: **stdio**.
+- Transporte local: **stdio**. Transporte remoto (`api/mcp.js`): **Streamable HTTP**, protegido con token compartido.
 - Los datos se leen del Google Sheet publicado como CSV y se cachean en memoria durante **60 segundos** para reducir peticiones.
 - Todas las tools son de solo lectura (no modifican el Sheet).
