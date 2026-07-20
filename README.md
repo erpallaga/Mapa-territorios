@@ -53,6 +53,36 @@ Se ha implementado una capa de seguridad y estabilidad superior para evitar los 
    ```
 4. Inicia el servidor de desarrollo: `npm run dev`
 
+## 🤖 Consultas en Lenguaje Natural (MCP)
+
+El proyecto incluye un servidor MCP (Model Context Protocol) de solo lectura que expone el
+estado de los territorios (libres/asignados, vencidos, estadísticas por zona) como *tools*
+consultables en lenguaje natural:
+
+- **`mcp-server/`**: servidor MCP local (stdio) para usar desde Claude Code/Desktop. Ver `mcp-server/README.md`.
+- **`api/mcp.js`**: el mismo servidor expuesto por HTTP en Vercel (protegido con un token compartido), para acceso remoto.
+- **`supabase/functions/ask-territorios/`**: Edge Function que expone una caja de preguntas dentro de la propia app — llama a la API de Anthropic (Claude Haiku 4.5) con el conector MCP apuntando a `api/mcp.js`, y devuelve la respuesta a los usuarios ya autenticados.
+
+### Variables de entorno adicionales
+
+Para la Edge Function `ask-territorios` (configurar como *secrets* de Supabase, no en `.env` del frontend):
+
+```bash
+supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+supabase secrets set MCP_SERVER_URL=https://<tu-proyecto>.vercel.app/api/mcp
+supabase secrets set MCP_SHARED_SECRET=<un-secreto-aleatorio-largo>
+```
+
+El mismo `MCP_SHARED_SECRET` debe configurarse también como variable de entorno del proyecto
+en Vercel (Project Settings → Environment Variables), ya que `api/mcp.js` lo usa para validar
+el header `Authorization: Bearer <secreto>` en cada petición.
+
+Desplegar la Edge Function:
+
+```bash
+supabase functions deploy ask-territorios
+```
+
 ## 📦 Despliegue (Vercel)
 
 El proyecto está configurado para despliegue continuo en Vercel. El script de `build` procesa automáticamente los archivos KML a JSON antes de generar el paquete estático.

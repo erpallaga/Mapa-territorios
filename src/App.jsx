@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Map } from './components/Map'
 import { TerritoryDetails } from './components/TerritoryDetails'
 import { Dashboard } from './components/Dashboard'
+import { AskTerritorios } from './components/AskTerritorios'
 import { AdminPanel } from './components/AdminPanel'
 import { LoginPage, AccessPending } from './components/LoginPage'
 import { useAuth } from './context/AuthContext'
@@ -150,8 +151,11 @@ function App() {
             )}
             {view === 'dashboard' && (
               <div className="h-full p-8 overflow-y-auto">
-                <div className="max-w-5xl mx-auto h-[600px]">
-                  <Dashboard territories={territories?.features} />
+                <div className="max-w-5xl mx-auto">
+                  <AskTerritorios />
+                  <div className="h-[600px]">
+                    <Dashboard territories={territories?.features} />
+                  </div>
                 </div>
               </div>
             )}
