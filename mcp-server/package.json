@@ -1,0 +1,18 @@
+{
+  "name": "territorios-mcp-server",
+  "version": "1.0.0",
+  "description": "Servidor MCP para consultar el estado de territorios y zonas en lenguaje natural",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "papaparse": "^5.5.4",
+    "zod": "^4.4.3"
+  }
+}
