@@ -2,6 +2,63 @@ import { useState, useRef, useEffect } from 'react'
 import { Sparkles, X, Loader2, Send } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 
+// Renderizado ligero del markdown que devuelve el modelo (negritas, listas,
+// encabezados y párrafos). Construye elementos React directamente, sin
+// dangerouslySetInnerHTML, para no introducir una dependencia nueva ni
+// riesgo de inyección de HTML.
+function renderInline(text, keyPrefix) {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g)
+    return parts.map((part, i) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={`${keyPrefix}-b${i}`}>{part.slice(2, -2)}</strong>
+        }
+        return <span key={`${keyPrefix}-t${i}`}>{part}</span>
+    })
+}
+
+function renderMarkdownLite(text) {
+    const lines = text.split('\n')
+    const elements = []
+    let listBuffer = []
+
+    const flushList = () => {
+        if (listBuffer.length === 0) return
+        elements.push(
+            <ul key={`ul-${elements.length}`} className="list-disc list-inside space-y-0.5">
+                {listBuffer.map((item, i) => (
+                    <li key={i}>{renderInline(item, `li-${elements.length}-${i}`)}</li>
+                ))}
+            </ul>
+        )
+        listBuffer = []
+    }
+
+    lines.forEach((line) => {
+        const trimmed = line.trim()
+        if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            listBuffer.push(trimmed.slice(2))
+            return
+        }
+        flushList()
+        if (trimmed === '') return
+        const heading = trimmed.match(/^#+\s*(.+)/)
+        if (heading) {
+            elements.push(
+                <p key={`h-${elements.length}`} className="font-semibold">
+                    {renderInline(heading[1], `h-${elements.length}`)}
+                </p>
+            )
+        } else {
+            elements.push(
+                <p key={`p-${elements.length}`}>{renderInline(trimmed, `p-${elements.length}`)}</p>
+            )
+        }
+    })
+    flushList()
+
+    return elements
+}
+
 export function AskTerritorios() {
     const [isOpen, setIsOpen] = useState(false)
     const [messages, setMessages] = useState([]) // { role: 'user' | 'assistant', content: string }
@@ -104,12 +161,12 @@ export function AskTerritorios() {
                             {messages.map((m, i) => (
                                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div
-                                        className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${m.role === 'user'
-                                            ? 'bg-blue-600 text-white'
+                                        className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm space-y-1 ${m.role === 'user'
+                                            ? 'bg-blue-600 text-white whitespace-pre-wrap'
                                             : 'bg-gray-100 text-gray-800'
                                             }`}
                                     >
-                                        {m.content}
+                                        {m.role === 'assistant' ? renderMarkdownLite(m.content) : m.content}
                                     </div>
                                 </div>
                             ))}

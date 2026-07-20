@@ -54,8 +54,11 @@ fecha de asignación, si está vencido (asignado hace más de 4 meses) y días d
         zona: t.zone,
         estado: t.status === "free" ? "libre" : "asignado",
         numViviendas: t.numViviendas,
-        publicador: t.publisher || null,
-        fechaAsignacion: t.assignedDate || null,
+        // El campo "publisher" del Sheet conserva el último nombre aunque el
+        // territorio ya esté libre de nuevo, así que solo lo mostramos si
+        // realmente sigue asignado.
+        publicador: t.status === "assigned" ? (t.publisher || null) : null,
+        fechaAsignacion: t.status === "assigned" ? (t.assignedDate || null) : null,
         vencido: t.isExpired,
         diasVencido: t.isExpired ? t.expiredDays : null
       }));
@@ -117,8 +120,11 @@ Si el ID no existe, devuelve un mensaje de error indicándolo.`,
         zona: t.zone,
         estado: t.status === "free" ? "libre" : "asignado",
         numViviendas: t.numViviendas,
-        publicador: t.publisher || null,
-        fechaAsignacion: t.assignedDate || null,
+        // Igual que en territorios_listar: no mostrar un publicador "actual"
+        // que en realidad es el último dato del historial de un territorio
+        // ya liberado.
+        publicador: t.status === "assigned" ? (t.publisher || null) : null,
+        fechaAsignacion: t.status === "assigned" ? (t.assignedDate || null) : null,
         ultimaFechaCompletado: t.lastCompletedDate || null,
         finalizacionesUltimos12Meses: t.completionCount12m,
         vencido: t.isExpired,
@@ -259,7 +265,7 @@ Solo lectura.
 
 Args:
   - publicador (string): nombre o parte del nombre del publicador (coincidencia parcial, sin distinguir mayúsculas).
-  - soloActuales (boolean): si true (por defecto), solo la asignación actual de ese publicador. Si false, también busca en el historial de asignaciones pasadas.
+  - soloActuales (boolean): si true (por defecto, recomendado para preguntas del tipo "¿qué territorios tiene X ahora?"), solo territorios cuyo estado sigue siendo "asignado" a ese publicador. Si false, también incluye coincidencias en el historial de asignaciones ya completadas (territorios que pueden estar libres de nuevo).
   - limit (number): máximo de resultados (1-100, por defecto 50).
   - offset (number): resultados a saltar para paginación.
 
@@ -275,11 +281,14 @@ fecha de asignación (y de finalización si es histórica), y si está vencido (
 
       for (const t of all) {
         if (soloActuales) {
-          if (t.publisher && t.publisher.toLowerCase().includes(needle)) {
+          // Importante: el campo "publisher" conserva el último nombre del
+          // historial aunque el territorio ya se haya liberado, así que
+          // "actual" exige también que el estado siga siendo "assigned".
+          if (t.status === "assigned" && t.publisher && t.publisher.toLowerCase().includes(needle)) {
             matches.push({
               id: t.id,
               zona: t.zone,
-              estado: t.status === "free" ? "libre" : "asignado",
+              estado: "asignado",
               publicador: t.publisher,
               fechaAsignacion: t.assignedDate || null,
               vencido: t.isExpired,
