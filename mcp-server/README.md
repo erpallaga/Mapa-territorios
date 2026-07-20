@@ -5,7 +5,7 @@ Servidor MCP (Model Context Protocol) de solo lectura para consultar el estado d
 ## Archivos
 
 - `data.js` — trae y cachea (60s) los datos del Sheet.
-- `tools.js` — define las 4 tools (`registerTerritorioTools(server)`), compartidas entre el entry point local (`index.js`, stdio) y el endpoint remoto en Vercel (`api/mcp.js`, HTTP).
+- `tools.js` — define las 5 tools (`registerTerritorioTools(server)`), compartidas entre el entry point local (`index.js`, stdio) y el endpoint remoto en Vercel (`api/mcp.js`, HTTP).
 - `index.js` — entry point local, transporte stdio.
 
 ## Instalación
@@ -63,6 +63,7 @@ usarlo. Ver el `README.md` de la raíz del proyecto para las variables de entorn
 | `territorios_buscar_por_id` | Devuelve el detalle completo de un territorio, incluyendo su historial de asignaciones. |
 | `territorios_vencidos` | Lista los territorios asignados desde hace más de 4 meses, ordenados por días de retraso. |
 | `territorios_estadisticas` | Resumen estadístico global (total, libres, asignados, vencidos) y desglose por zona. |
+| `territorios_buscar_por_publicador` | Busca territorios por nombre de publicador (coincidencia parcial), sin necesidad de acotar por zona. Opcionalmente incluye el historial de asignaciones pasadas. |
 
 ## Notas técnicas
 
