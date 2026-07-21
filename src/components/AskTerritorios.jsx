@@ -16,6 +16,30 @@ function renderInline(text, keyPrefix) {
     })
 }
 
+// En móvil el teclado del sistema se superpone al viewport sin cambiar las
+// unidades vh/dvh, por lo que un modal con altura fija se sale de la pantalla.
+// Seguimos el VisualViewport para conocer el área realmente visible y ajustar
+// el alto y la posición del modal justo encima del teclado.
+function useVisualViewport() {
+    const [viewport, setViewport] = useState(null)
+
+    useEffect(() => {
+        const vv = typeof window !== 'undefined' ? window.visualViewport : null
+        if (!vv) return
+
+        const update = () => setViewport({ height: vv.height, offsetTop: vv.offsetTop })
+        update()
+        vv.addEventListener('resize', update)
+        vv.addEventListener('scroll', update)
+        return () => {
+            vv.removeEventListener('resize', update)
+            vv.removeEventListener('scroll', update)
+        }
+    }, [])
+
+    return viewport
+}
+
 function renderMarkdownLite(text) {
     const lines = text.split('\n')
     const elements = []
@@ -66,6 +90,13 @@ export function AskTerritorios() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const scrollRef = useRef(null)
+    const viewport = useVisualViewport()
+
+    // Constrain the overlay to the actually-visible area so the sheet never
+    // grows past the viewport or hides behind the on-screen keyboard.
+    const overlayStyle = viewport
+        ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' }
+        : undefined
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -120,10 +151,11 @@ export function AskTerritorios() {
             {isOpen && (
                 <div
                     className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40"
+                    style={overlayStyle}
                     onClick={() => setIsOpen(false)}
                 >
                     <div
-                        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl flex flex-col h-[85dvh] max-h-[85dvh] sm:h-[600px] sm:max-h-[85vh]"
+                        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl flex flex-col h-[85dvh] max-h-full sm:h-[600px]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
