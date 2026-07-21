@@ -1,9 +1,19 @@
-// VERIFIED 2026-07-21: status 200. observation.type "tool" -> supported.
-// Langfuse's public GET /api/public/traces/{id} echoes it back as the
-// uppercased literal "TOOL" (Langfuse normalizes/uppercases observation
-// types internally). Later tasks may use 'tool' as the OTLP attribute value
-// on langfuse.observation.type and expect it to survive as its own
-// observation type (not coerced to a generic span).
+// VERIFIED 2026-07-21: status 200. The `checks` array below is the actual
+// contract enforced by this script's exit code (0 only if every check
+// passes) — this comment just orients a human reader to what matters most:
+//   - observation.type "tool" -> supported. Langfuse's public
+//     GET /api/public/traces/{id} echoes it back as the uppercased literal
+//     "TOOL" (Langfuse normalizes/uppercases observation types internally).
+//     Asserted case-insensitively so the "survives as its own type" claim is
+//     enforced, not just logged.
+//   - OTLP `parentSpanId` becomes real observation nesting: the read API
+//     returns it as `parentObservationId`, set to the *observation id* of
+//     the parent (which round-trips as the OTLP spanId hex we generated).
+//     Asserted for both root->generation and generation->tool.
+// Later tasks may use 'tool' as the OTLP attribute value on
+// langfuse.observation.type and expect it to survive as its own observation
+// type (not coerced to a generic span), and may rely on parentSpanId to
+// reconstruct nested tool calls under a generation.
 //
 // Dev utility: posts one hand-built OTLP/JSON trace to Langfuse to verify the
 // wire format used by supabase/functions/_shared/langfuse.ts. Also the first
@@ -34,6 +44,12 @@ const sessionId = crypto.randomUUID();
 const now = Date.now();
 const nano = (ms) => String(BigInt(Math.round(ms)) * 1_000_000n);
 
+// Contract: `value` must already be a primitive or a pre-stringified
+// object/array (e.g. JSON.stringify({...})). This does NOT serialize objects
+// or arrays itself — passing a raw object/array falls through to the
+// stringValue branch and silently becomes the useless string
+// "[object Object]" (or similar). Callers are responsible for stringifying
+// complex values before calling attr().
 const attr = (key, value) => {
   if (typeof value === 'number' && Number.isInteger(value)) {
     return { key, value: { intValue: String(value) } };
@@ -157,6 +173,16 @@ async function pollForTrace(id, { timeoutMs = 60_000, intervalMs = 3_000 } = {})
     if (r.status === 200) {
       return { status: r.status, json: await r.json() };
     }
+    // 404 means "not ingested yet" — the legitimate reason to keep polling.
+    // Any other 4xx (401 unauthorized, 403 forbidden, etc.) is terminal: the
+    // request itself is wrong and will never succeed no matter how long we
+    // wait, so fail fast instead of burning the full timeout.
+    if (r.status !== 404 && r.status >= 400 && r.status < 500) {
+      const errBody = await r.text().catch(() => '');
+      throw new Error(
+        `Terminal error ${r.status} while polling trace ${id} — not retrying. Body: ${errBody}`
+      );
+    }
     lastBody = await r.text().catch(() => '');
     await sleep(intervalMs);
   }
@@ -170,8 +196,12 @@ const { status: fetchStatus, json: trace } = await pollForTrace(traceId);
 console.log('trace-fetch status:', fetchStatus);
 
 const observations = trace.observations ?? [];
-const generation = observations.find((o) => o.type === 'GENERATION' || o.name === 'anthropic-messages');
-const toolObservation = observations.find((o) => o.name === 'territorios_vencidos');
+// Observation ids round-trip exactly as the spanId hex we generated above, so
+// look observations up by id rather than by name/type — that's what lets us
+// assert nesting (parentObservationId) unambiguously below.
+const root = observations.find((o) => o.id === rootId);
+const generation = observations.find((o) => o.id === genId);
+const toolObservation = observations.find((o) => o.id === toolId);
 
 const checks = [
   ['trace.name === "ask-territorios"', trace.name === 'ask-territorios', trace.name],
@@ -194,6 +224,26 @@ const checks = [
     generation?.calculatedTotalCost,
   ],
   ['tool observation found', !!toolObservation, toolObservation?.name],
+  [
+    'root span has no parent (parentObservationId === null)',
+    !!root && root.parentObservationId == null,
+    root?.parentObservationId,
+  ],
+  [
+    'generation.parentObservationId === root observation id (OTLP parentSpanId -> real nesting)',
+    !!generation && !!root && generation.parentObservationId === root.id,
+    generation?.parentObservationId,
+  ],
+  [
+    'toolObservation.parentObservationId === generation observation id (OTLP parentSpanId -> real nesting)',
+    !!toolObservation && !!generation && toolObservation.parentObservationId === generation.id,
+    toolObservation?.parentObservationId,
+  ],
+  [
+    'tool observation type survives as its own type (case-insensitive "tool")',
+    typeof toolObservation?.type === 'string' && toolObservation.type.toLowerCase() === 'tool',
+    toolObservation?.type,
+  ],
 ];
 
 console.log('\n--- Verification assertions ---');
