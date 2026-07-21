@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Map } from './components/Map'
 import { TerritoryDetails } from './components/TerritoryDetails'
 import { Dashboard } from './components/Dashboard'
+import { AskTerritorios } from './components/AskTerritorios'
 import { AdminPanel } from './components/AdminPanel'
 import { LoginPage, AccessPending } from './components/LoginPage'
 import { useAuth } from './context/AuthContext'
@@ -80,7 +81,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-gray-50 overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-gray-50 overflow-hidden">
       {/* Sidebar Navigation (Desktop) */}
       <aside className="hidden md:flex w-16 flex-col items-center py-6 bg-white border-r border-gray-200 z-10">
         <div className="mb-8">
@@ -159,15 +160,14 @@ function App() {
         )}
       </main>
 
+      <AskTerritorios />
+
       {/* Mobile Navigation (Top Bar) */}
       <div className="md:hidden fixed top-0 left-0 right-0 min-h-[64px] pb-2 pt-2 bg-white/75 backdrop-blur-lg border-b border-gray-200 flex items-center justify-between px-3 z-50">
-        <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+        <div className="flex items-center shrink-0 mr-2">
           <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-100 overflow-hidden shrink-0">
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt="Territorios Sarrià-Les Corts" className="w-full h-full object-cover" />
           </div>
-          <span className="font-bold text-gray-900 text-[11px] leading-tight break-words">
-            Territorios Sarrià-Les Corts
-          </span>
         </div>
 
         {/* Segmented Control */}
