@@ -226,7 +226,7 @@ export function AskTerritorios() {
                                 placeholder="Escribe tu pregunta..."
                                 disabled={loading}
                                 autoFocus
-                                className="flex-1 rounded-xl border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                                className="flex-1 min-w-0 rounded-xl border border-gray-200 px-4 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
                             />
                             <button
                                 type="submit"
