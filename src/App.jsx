@@ -164,13 +164,10 @@ function App() {
 
       {/* Mobile Navigation (Top Bar) */}
       <div className="md:hidden fixed top-0 left-0 right-0 min-h-[64px] pb-2 pt-2 bg-white/75 backdrop-blur-lg border-b border-gray-200 flex items-center justify-between px-3 z-50">
-        <div className="flex items-center gap-2 flex-1 min-w-0 mr-2">
+        <div className="flex items-center shrink-0 mr-2">
           <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm border border-gray-100 overflow-hidden shrink-0">
-            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+            <img src="/logo.png" alt="Territorios Sarrià-Les Corts" className="w-full h-full object-cover" />
           </div>
-          <span className="font-bold text-gray-900 text-[11px] leading-tight break-words">
-            Territorios Sarrià-Les Corts
-          </span>
         </div>
 
         {/* Segmented Control */}
