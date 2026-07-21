@@ -81,7 +81,7 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen w-full bg-gray-50 overflow-hidden">
+    <div className="flex h-[100dvh] w-full bg-gray-50 overflow-hidden">
       {/* Sidebar Navigation (Desktop) */}
       <aside className="hidden md:flex w-16 flex-col items-center py-6 bg-white border-r border-gray-200 z-10">
         <div className="mb-8">
