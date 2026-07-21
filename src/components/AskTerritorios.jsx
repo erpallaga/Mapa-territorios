@@ -110,7 +110,7 @@ export function AskTerritorios() {
         <>
             <button
                 onClick={() => setIsOpen(true)}
-                className="fixed bottom-6 right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
+                className="fixed bottom-[68px] right-4 sm:bottom-6 sm:right-6 z-40 flex items-center gap-2 px-4 py-3 rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 transition-colors"
                 title="Preguntar sobre los territorios"
             >
                 <Sparkles className="w-5 h-5" />
@@ -119,11 +119,11 @@ export function AskTerritorios() {
 
             {isOpen && (
                 <div
-                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40"
+                    className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/40"
                     onClick={() => setIsOpen(false)}
                 >
                     <div
-                        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl flex flex-col h-[85vh] sm:h-[600px]"
+                        className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-xl flex flex-col h-[85dvh] max-h-[85dvh] sm:h-[600px] sm:max-h-[85vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -182,7 +182,11 @@ export function AskTerritorios() {
                         </div>
 
                         {/* Input */}
-                        <form onSubmit={handleSubmit} className="flex gap-2 px-5 py-4 border-t border-gray-100 shrink-0">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="flex gap-2 px-5 pt-4 pb-4 border-t border-gray-100 shrink-0"
+                            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+                        >
                             <input
                                 type="text"
                                 value={question}
