@@ -1,0 +1,16 @@
+{
+  "name": "ask-territorios-eval",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Offline evaluation harness for the ask-territorios agent. Isolated from the Vite app's dependency tree.",
+  "scripts": {
+    "seed": "node --env-file=../../.env seed-dataset.mjs",
+    "eval": "node --env-file=../../.env run-experiment.mjs"
+  },
+  "dependencies": {
+    "@langfuse/client": "^5.6.0",
+    "@langfuse/otel": "^5.6.0",
+    "@opentelemetry/sdk-node": "^0.57.0"
+  }
+}
