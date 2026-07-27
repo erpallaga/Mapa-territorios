@@ -27,3 +27,6 @@ dist-ssr
 
 # superpowers SDD scratch
 .superpowers/
+
+# Supabase CLI local link state
+supabase/.temp
