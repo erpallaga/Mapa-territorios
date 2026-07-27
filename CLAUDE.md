@@ -26,6 +26,16 @@ Separate Node package, not part of the Vite app's dependency tree.
 - `npm start` (or `node index.js`) — runs the stdio MCP server directly
 - Register with Claude Code: `claude mcp add territorios-mcp -- node "<abs-path>/mcp-server/index.js"`
 
+### Evals (`scripts/eval/`)
+
+Separate Node package, not part of the Vite app's dependency tree. Needs a root `.env` with the Langfuse, Anthropic, and MCP variables.
+
+- `cd scripts/eval && npm install`
+- `npm run seed` — upload `dataset.json` to the Langfuse dataset `ask-territorios-v1`
+- `npm run eval` — run the experiment and print scores
+- `node --env-file=.env scripts/langfuse-seed-prompt.mjs` (from repo root) — push the system prompt to Langfuse
+- `node --env-file=.env scripts/langfuse-otel-spike.mjs` (from repo root) — debug the OTLP wire format when traces stop appearing
+
 ## Architecture
 
 ### Data pipeline: two independent sources merged at runtime
@@ -48,6 +58,18 @@ The same sheet-parsing logic (`fetchTerritoryData`) is reused as-is by `mcp-serv
 ### Admin operations go through Supabase Edge Functions, not the client directly
 
 `supabase/functions/send-invitation` and `supabase/functions/delete-user` are Deno edge functions that perform privileged operations (inviting users, cascading account deletion) using the Supabase service-role key. They independently re-verify the caller is an admin (via the caller's own JWT against `profiles.role`) before using the admin client — the client-side `isAdmin` check is UI-only and must not be trusted as the authorization boundary. Any new privileged admin action should follow this same pattern (edge function + server-side re-check), not a direct client-side Supabase call.
+
+### Observability (Langfuse)
+
+The `ask-territorios` agent is traced to Langfuse Cloud EU.
+
+- **Transport**: `supabase/functions/_shared/langfuse.ts` hand-builds OTLP/HTTP JSON and POSTs it to `/api/public/otel/v1/traces`. It has **zero dependencies on purpose** — it runs in the Deno edge runtime. Do not "improve" this by pulling in the Langfuse SDK or an OTEL stack.
+- **Never blocks**: the flush runs via `EdgeRuntime.waitUntil` after the response is returned, and every Langfuse call is wrapped in try/catch. If `LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` are absent, all tracing silently no-ops so local dev works without Langfuse. Preserve both properties.
+- **Tool observations are reconstructed**, not measured. Anthropic's MCP connector executes tools on its own servers, so we only get `mcp_tool_use`/`mcp_tool_result` blocks back — name, args, result, but no latency. They are recorded with zero duration and `metadata.reconstructed=true`. Trace context also cannot cross the MCP connector, which is why `api/mcp.js` is deliberately not instrumented.
+- **System prompt lives in Langfuse** (`ask-territorios-system`, label `production`), fetched by `supabase/functions/_shared/prompt.ts` with a 60s module-scope cache. `FALLBACK_SYSTEM_PROMPT` in that file is the safety net and must stay in sync with the seeded prompt — `scripts/langfuse-seed-prompt.mjs` pushes it.
+- **Evals**: `scripts/eval/` is an isolated Node package (like `mcp-server/`) so `@langfuse/client` stays out of the Vite app's tree. `npm run seed` uploads `dataset.json`; `npm run eval` runs the experiment. `expectedOutput` in the dataset is a **grading rubric, not a literal answer**, because territory data is a live Google Sheet and frozen answers would rot. The dataset must never contain real publisher names.
+- **Known duplication**: `MODEL` and `MAX_TOKENS` exist in both `supabase/functions/ask-territorios/index.ts` and `scripts/eval/agent.mjs`. Change both together.
+- **Env vars**: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_ENVIRONMENT` — set as Supabase secrets for the deployed function and in a gitignored root `.env` for the scripts.
 
 ### RLS / DB performance note (from README)
 

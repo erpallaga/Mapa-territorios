@@ -89,6 +89,9 @@ export function AskTerritorios() {
     const [question, setQuestion] = useState('')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
+    // Agrupa los mensajes de una misma conversación en Langfuse. Es solo
+    // telemetría: el servidor valida la forma y nunca lo usa para autorizar.
+    const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
     const scrollRef = useRef(null)
     const viewport = useVisualViewport()
 
@@ -117,7 +120,7 @@ export function AskTerritorios() {
 
         try {
             const { data, error: invokeError } = await supabase.functions.invoke('ask-territorios', {
-                body: { messages: nextMessages },
+                body: { messages: nextMessages, sessionId },
             })
 
             if (invokeError) throw invokeError
@@ -135,6 +138,7 @@ export function AskTerritorios() {
     const handleNewConversation = () => {
         setMessages([])
         setError('')
+        setSessionId(crypto.randomUUID())
     }
 
     return (

@@ -1,0 +1,102 @@
+[
+  {
+    "input": "¿Cuántos territorios hay en total?",
+    "expectedOutput": "Debe dar un número total de territorios (alrededor de 180) obtenido de las tools. No debe inventar.",
+    "metadata": { "category": "lookup", "requiresTool": true }
+  },
+  {
+    "input": "¿Está libre el territorio 12?",
+    "expectedOutput": "Debe indicar claramente si el territorio 12 está libre o asignado, según las tools.",
+    "metadata": { "category": "lookup", "requiresTool": true }
+  },
+  {
+    "input": "Dame información del territorio 45",
+    "expectedOutput": "Debe describir el territorio 45: su zona, su estado y, si está asignado, desde cuándo.",
+    "metadata": { "category": "lookup", "requiresTool": true }
+  },
+  {
+    "input": "¿Qué territorios están vencidos?",
+    "expectedOutput": "Debe listar los territorios vencidos con su id, o decir que no hay ninguno. Debe basarse en las tools.",
+    "metadata": { "category": "expired", "requiresTool": true }
+  },
+  {
+    "input": "¿Hay algún territorio vencido en Sarrià?",
+    "expectedOutput": "Debe responder concretamente sobre la zona Sarrià, listando los vencidos de esa zona o diciendo que no hay.",
+    "metadata": { "category": "expired", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuántos territorios llevan más de cuatro meses asignados?",
+    "expectedOutput": "Debe entender que eso son los territorios vencidos y dar un número coherente con las tools.",
+    "metadata": { "category": "expired", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuántos territorios libres hay en Les Corts Norte?",
+    "expectedOutput": "Debe dar un número de territorios libres específico de la zona Les Corts Norte.",
+    "metadata": { "category": "zone", "requiresTool": true }
+  },
+  {
+    "input": "Lístame los territorios de Pedralbes",
+    "expectedOutput": "Debe listar territorios de la zona Pedralbes con sus ids y estados.",
+    "metadata": { "category": "zone", "requiresTool": true }
+  },
+  {
+    "input": "¿Qué zonas hay?",
+    "expectedOutput": "Debe nombrar las zonas reales: Les Corts Norte, Les Corts Sur, Pedralbes, Sants y Sarrià.",
+    "metadata": { "category": "zone", "requiresTool": true }
+  },
+  {
+    "input": "¿En qué zona hay más territorios sin asignar?",
+    "expectedOutput": "Debe comparar zonas y nombrar una zona concreta con un número, coherente con las tools.",
+    "metadata": { "category": "zone", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuántos territorios hay asignados ahora mismo?",
+    "expectedOutput": "Debe dar el número de territorios asignados obtenido de las tools.",
+    "metadata": { "category": "lookup", "requiresTool": true }
+  },
+  {
+    "input": "Dame un resumen del estado de los territorios",
+    "expectedOutput": "Debe resumir totales: cuántos libres, cuántos asignados y cuántos vencidos.",
+    "metadata": { "category": "lookup", "requiresTool": true }
+  },
+  {
+    "input": "¿Quién tiene asignado el territorio 3?",
+    "expectedOutput": "Debe decir quién lo tiene asignado según las tools, o que está libre si no está asignado.",
+    "metadata": { "category": "history", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuándo se asignó por última vez el territorio 20?",
+    "expectedOutput": "Debe dar una fecha de asignación obtenida de las tools, o decir que no consta.",
+    "metadata": { "category": "history", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuál es el historial del territorio 7?",
+    "expectedOutput": "Debe describir asignaciones anteriores del territorio 7 según las tools, o decir que no hay historial.",
+    "metadata": { "category": "history", "requiresTool": true }
+  },
+  {
+    "input": "¿Está libre el territorio 9999?",
+    "expectedOutput": "Debe decir que ese territorio no existe o que no lo encuentra. NO debe inventarse un estado ni una zona.",
+    "metadata": { "category": "nonexistent", "requiresTool": true }
+  },
+  {
+    "input": "Dime el estado del territorio de Gracia",
+    "expectedOutput": "Debe indicar que no existe esa zona o que no encuentra ese territorio. NO debe inventarse datos.",
+    "metadata": { "category": "nonexistent", "requiresTool": true }
+  },
+  {
+    "input": "Asigna el territorio 5 a Juan",
+    "expectedOutput": "Debe negarse o explicar que solo puede consultar información, no modificarla. NO debe afirmar que lo ha asignado.",
+    "metadata": { "category": "out-of-scope", "requiresTool": false }
+  },
+  {
+    "input": "¿Qué tiempo hace hoy en Barcelona?",
+    "expectedOutput": "Debe decir que solo puede responder sobre el estado de los territorios. NO debe dar el tiempo.",
+    "metadata": { "category": "out-of-scope", "requiresTool": false }
+  },
+  {
+    "input": "Escríbeme un poema sobre los territorios",
+    "expectedOutput": "Debe redirigir a su función de consulta sobre el estado de los territorios en vez de escribir un poema.",
+    "metadata": { "category": "out-of-scope", "requiresTool": false }
+  }
+]

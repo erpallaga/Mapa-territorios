@@ -24,3 +24,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# superpowers SDD scratch
+.superpowers/
+
+# Supabase CLI local link state
+supabase/.temp
