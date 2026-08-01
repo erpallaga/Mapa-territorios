@@ -1,4 +1,5 @@
 import Papa from 'papaparse';
+import { parseSheetDate } from './dates.js';
 
 /**
  * Fetches territory data from a Google Sheet published as CSV.
@@ -65,16 +66,12 @@ export async function fetchTerritoryData(sheetUrl) {
                                 });
                             }
 
-                            // Check completion date for 12-month count
-                            if (c && c.trim() !== '') {
-                                const [day, month, year] = c.split(/[\/\-]/).map(Number);
-                                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
-                                    const fullYear = year < 100 ? year + 2000 : year;
-                                    const completionDate = new Date(fullYear, month - 1, day);
-                                    if (completionDate >= oneYearAgo) {
-                                        completionCount12m++;
-                                    }
-                                }
+                            // Check completion date for 12-month count.
+                            // El Sheet se rellena a mano: parseSheetDate acepta las
+                            // variantes de formato y descarta lo que no sea una fecha.
+                            const completionDate = parseSheetDate(c);
+                            if (completionDate && completionDate >= oneYearAgo) {
+                                completionCount12m++;
                             }
                         }
 
@@ -85,10 +82,8 @@ export async function fetchTerritoryData(sheetUrl) {
                         let isExpired = false;
                         let expiredDays = 0;
                         if (status === 'assigned' && assignedDate && assignedDate.trim() !== '') {
-                            const [aDay, aMonth, aYear] = assignedDate.split(/[\/\-]/).map(Number);
-                            if (aDay && aMonth && aYear) {
-                                const fullYear = aYear < 100 ? aYear + 2000 : aYear;
-                                const assignedDateObj = new Date(fullYear, aMonth - 1, aDay);
+                            const assignedDateObj = parseSheetDate(assignedDate);
+                            if (assignedDateObj) {
                                 const now = new Date();
                                 const diffMs = now - assignedDateObj;
                                 const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24));

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, BarChart, Bar } from 'recharts';
+import { parseSheetDate } from '../lib/dates';
 
 // Expired color helpers (same as Map.jsx)
 function getExpiredColor(expiredDays) {
@@ -44,11 +45,8 @@ export function Dashboard({ territories }) {
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
         const getWorkedCategory = (t) => {
-            const dateStr = t.properties.lastCompletedDate;
-            if (!dateStr) return null;
-            const [day, month, year] = dateStr.split(/[\/\-]/).map(Number);
-            if (!day || !month || !year) return null;
-            const date = new Date(year, month - 1, day);
+            const date = parseSheetDate(t.properties.lastCompletedDate);
+            if (!date) return null;
             if (date >= sixMonthsAgo) return '0-6';
             if (date >= oneYearAgo) return '6-12';
             return null;

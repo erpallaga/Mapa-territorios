@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-l
 import 'leaflet/dist/leaflet.css';
 import { cn } from '../lib/utils';
 import { calculateBounds, calculateFeatureCentroid } from '../lib/territories';
+import { parseSheetDate } from '../lib/dates';
 import { Legend } from './Legend';
 
 // Fix for default Leaflet icon issues in React
@@ -89,11 +90,9 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
 
     // Helper to calculate months since last worked
     const getMonthsSinceWorked = (dateStr) => {
-        if (!dateStr) return Infinity;
-        const [day, month, year] = dateStr.split(/[\/\-]/).map(Number);
-        if (!day || !month || !year) return Infinity;
+        const lastWorked = parseSheetDate(dateStr);
+        if (!lastWorked) return Infinity;
 
-        const lastWorked = new Date(year, month - 1, day);
         const now = new Date();
 
         const diffTime = Math.abs(now - lastWorked);
