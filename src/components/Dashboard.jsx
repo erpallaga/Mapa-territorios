@@ -1,14 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, BarChart, Bar } from 'recharts';
+import { parseSheetDate } from '../lib/dates';
 
-// Expired color helpers (same as Map.jsx)
-function getExpiredColor(expiredDays) {
-    if (expiredDays < 30) return '#fbbf24';
-    if (expiredDays < 90) return '#f97316';
-    if (expiredDays < 180) return '#ef4444';
-    return '#991b1b';
-}
-
+// Expired color helper (el equivalente de color vive en Map.jsx, que es quien pinta)
 function getExpiredBucket(expiredDays) {
     if (expiredDays < 30) return '< 1 mes';
     if (expiredDays < 90) return '1-3 meses';
@@ -19,14 +13,15 @@ function getExpiredBucket(expiredDays) {
 export function Dashboard({ territories }) {
     const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
 
-    if (!territories) return null;
-
-    // Process data: Deduplicate and calculate stats
-    const { uniqueTerritories, stats, chartData, frequencyData, zoneStats } = useMemo(() => {
+    // OJO: nada de returns antes de este useMemo. Si el hook se salta en el
+    // render en que `territories` aún es null, React pierde el orden de los
+    // hooks en cuanto llegan los datos. El guard va después, con el resultado
+    // ya calculado sobre una lista vacía.
+    const { stats, chartData, frequencyData, zoneStats } = useMemo(() => {
         const uniqueMap = new Map();
 
         // Deduplicate by ID
-        territories.forEach(t => {
+        (territories || []).forEach(t => {
             const id = t.properties.id;
             if (id && !uniqueMap.has(id)) {
                 uniqueMap.set(id, t);
@@ -44,11 +39,8 @@ export function Dashboard({ territories }) {
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
         const getWorkedCategory = (t) => {
-            const dateStr = t.properties.lastCompletedDate;
-            if (!dateStr) return null;
-            const [day, month, year] = dateStr.split(/[\/\-]/).map(Number);
-            if (!day || !month || !year) return null;
-            const date = new Date(year, month - 1, day);
+            const date = parseSheetDate(t.properties.lastCompletedDate);
+            if (!date) return null;
             if (date >= sixMonthsAgo) return '0-6';
             if (date >= oneYearAgo) return '6-12';
             return null;
@@ -259,13 +251,14 @@ export function Dashboard({ territories }) {
         const zoneStatsArray = Object.values(zStats).sort((a, b) => a.name.localeCompare(b.name));
 
         return {
-            uniqueTerritories: unique,
             stats: globalStats,
             chartData,
             frequencyData,
             zoneStats: zoneStatsArray
         };
     }, [territories, viewMode]);
+
+    if (!territories) return null;
 
     return (
         <div className="space-y-8 pb-8">
@@ -448,7 +441,6 @@ function ZoneCard({ zone, mode }) {
     } else if (mode === 'expired') {
         // Expired View
         const expiredPct = zone.assignedCount > 0 ? Math.round((zone.expiredCount / zone.assignedCount) * 100) : 0;
-        const onTimePct = zone.assignedCount > 0 ? Math.round((zone.onTimeCount / zone.assignedCount) * 100) : 0;
 
         return (
             <div className="p-4 border border-gray-200 rounded-xl hover:border-amber-300 transition-colors bg-gray-50/50">

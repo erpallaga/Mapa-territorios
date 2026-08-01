@@ -98,5 +98,75 @@
     "input": "Escríbeme un poema sobre los territorios",
     "expectedOutput": "Debe redirigir a su función de consulta sobre el estado de los territorios en vez de escribir un poema.",
     "metadata": { "category": "out-of-scope", "requiresTool": false }
+  },
+  {
+    "input": "¿Qué territorios se trabajaron en junio?",
+    "expectedOutput": "Debe listar territorios completados en junio (o decir que ninguno), basándose en las tools. Debe dejar claro de qué junio habla (año). NO debe confundir 'trabajado' con 'asignado'.",
+    "metadata": { "category": "dates", "requiresTool": true }
+  },
+  {
+    "input": "¿Qué territorios se han devuelto la semana pasada?",
+    "expectedOutput": "Debe resolver 'la semana pasada' mediante la tool (no inventándose las fechas), indicar el rango concreto que ha mirado y listar los territorios completados en él, o decir que ninguno.",
+    "metadata": { "category": "dates", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuántos territorios se asignaron en los últimos 6 meses?",
+    "expectedOutput": "Debe dar un número de asignaciones de los últimos 6 meses obtenido de las tools, no de un cálculo propio. Debe distinguir asignaciones de finalizaciones.",
+    "metadata": { "category": "dates", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuántos territorios se completaron cada mes durante el último año?",
+    "expectedOutput": "Debe dar un desglose por meses con números coherentes, obtenido agrupando en la tool. No debe listar evento a evento ni inventar meses sin datos.",
+    "metadata": { "category": "dates", "requiresTool": true }
+  },
+  {
+    "input": "¿Ha habido algún movimiento en Sants el mes pasado?",
+    "expectedOutput": "Debe combinar el filtro de zona con el del mes anterior y responder concretamente sobre Sants, indicando el mes que ha mirado, o decir que no hubo movimiento.",
+    "metadata": { "category": "dates", "requiresTool": true }
+  },
+  {
+    "input": "¿En qué mes se han trabajado más territorios este año?",
+    "expectedOutput": "Debe nombrar un mes concreto con un número, coherente con las tools. NO debe inventar el dato ni responder de memoria.",
+    "metadata": { "category": "dates", "requiresTool": true }
+  },
+  {
+    "input": "¿Quién tiene más territorios asignados ahora mismo?",
+    "expectedOutput": "Debe nombrar a un publicador concreto de los que devuelven las tools, con cuántos territorios tiene. NO debe inventarse nombres.",
+    "metadata": { "category": "publisher", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuántos publicadores tienen algún territorio asignado?",
+    "expectedOutput": "Debe dar un número obtenido de las tools. No hace falta que liste los nombres.",
+    "metadata": { "category": "publisher", "requiresTool": true }
+  },
+  {
+    "input": "¿Hay algún publicador con territorios vencidos?",
+    "expectedOutput": "Debe responder sí/no y, si los hay, nombrar publicadores concretos con sus territorios vencidos, según las tools.",
+    "metadata": { "category": "publisher", "requiresTool": true }
+  },
+  {
+    "input": "¿Qué territorios tiene asignados Juan Ejemplo?",
+    "expectedOutput": "Debe decir que no encuentra ningún publicador con ese nombre. NO debe inventarse territorios ni atribuirle los de otra persona.",
+    "metadata": { "category": "nonexistent", "requiresTool": true }
+  },
+  {
+    "input": "¿Qué territorios llevan más tiempo sin trabajarse?",
+    "expectedOutput": "Debe listar territorios ordenados por tiempo sin completarse, incluyendo los que están libres. NO debe confundirlo con los territorios vencidos (que son los asignados hace más de 4 meses).",
+    "metadata": { "category": "stale", "requiresTool": true }
+  },
+  {
+    "input": "¿Cuánto tiempo lleva el territorio 12 sin trabajarse?",
+    "expectedOutput": "Debe dar la última fecha en que se completó el territorio 12 y cuánto tiempo hace, o decir que no consta ninguna. NO debe inventar la fecha.",
+    "metadata": { "category": "stale", "requiresTool": true }
+  },
+  {
+    "input": "¿Quién ha completado más territorios en los últimos 6 meses, y qué tiene asignado ahora?",
+    "expectedOutput": "Debe encadenar dos consultas: primero quién más ha completado en el periodo, después qué territorios tiene asignados esa persona ahora. Ambos datos deben venir de las tools y referirse al mismo publicador.",
+    "metadata": { "category": "chained", "requiresTool": true }
+  },
+  {
+    "input": "De los territorios vencidos, ¿cuál lleva más tiempo sin trabajarse de verdad?",
+    "expectedOutput": "Debe distinguir 'vencido' (asignación actual de más de 4 meses) de 'sin trabajarse' (última finalización antigua), cruzar ambas cosas y nombrar un territorio concreto con sus datos.",
+    "metadata": { "category": "chained", "requiresTool": true }
   }
 ]

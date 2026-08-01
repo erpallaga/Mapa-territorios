@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-l
 import 'leaflet/dist/leaflet.css';
 import { cn } from '../lib/utils';
 import { calculateBounds, calculateFeatureCentroid } from '../lib/territories';
+import { parseSheetDate } from '../lib/dates';
 import { Legend } from './Legend';
 
 // Fix for default Leaflet icon issues in React
@@ -51,6 +52,35 @@ function getExpiredColorDot(expiredDays) {
     return '🔴';
 }
 
+// Helper to calculate months since last worked
+function getMonthsSinceWorked(dateStr) {
+    const lastWorked = parseSheetDate(dateStr);
+    if (!lastWorked) return Infinity;
+
+    const now = new Date();
+
+    const diffTime = Math.abs(now - lastWorked);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffMonths = diffDays / 30.44;
+
+    return diffMonths;
+}
+
+// Helper to get color for history view
+function getColorForHistory(months, status) {
+    if (months > 12) {
+        if (status === 'assigned') {
+            return '#f59e0b';
+        }
+        return '#ef4444';
+    }
+
+    if (months <= 3) return '#93c5fd';
+    if (months <= 6) return '#3b82f6';
+    if (months <= 9) return '#1d4ed8';
+    return '#1e3a8a';
+}
+
 export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     const [mapBounds, setMapBounds] = useState(null);
     const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
@@ -87,39 +117,8 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         }
     }, [filteredTerritories]);
 
-    // Helper to calculate months since last worked
-    const getMonthsSinceWorked = (dateStr) => {
-        if (!dateStr) return Infinity;
-        const [day, month, year] = dateStr.split(/[\/\-]/).map(Number);
-        if (!day || !month || !year) return Infinity;
-
-        const lastWorked = new Date(year, month - 1, day);
-        const now = new Date();
-
-        const diffTime = Math.abs(now - lastWorked);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        const diffMonths = diffDays / 30.44;
-
-        return diffMonths;
-    };
-
-    // Helper to get color for history view
-    const getColorForHistory = (months, status) => {
-        if (months > 12) {
-            if (status === 'assigned') {
-                return '#f59e0b';
-            }
-            return '#ef4444';
-        }
-
-        if (months <= 3) return '#93c5fd';
-        if (months <= 6) return '#3b82f6';
-        if (months <= 9) return '#1d4ed8';
-        return '#1e3a8a';
-    };
-
     // Style function for polygons
-    const style = (feature) => {
+    const style = useCallback((feature) => {
         const status = feature?.properties?.status;
         const lastCompletedDate = feature?.properties?.lastCompletedDate;
         const featureId = feature?.properties?.id;
@@ -171,7 +170,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             dashArray,
             fillOpacity
         };
-    };
+    }, [viewMode, highlightedId]);
 
     // Highlight on hover + click behavior
     const onEachFeature = (feature, layer) => {
@@ -297,7 +296,9 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 });
             }
         }
-    }, [viewMode, highlightedId]);
+        // `style` ya se recrea cuando cambian viewMode o highlightedId, así que
+        // listarlo a él basta: es la única dependencia real de este callback.
+    }, [style]);
 
     return (
         <div className="h-full w-full relative z-0">

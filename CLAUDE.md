@@ -15,8 +15,8 @@ Run from repo root unless noted.
 - `npm run import-kml` — standalone: converts `/kmlfiles/*.kml` → `public/data/territories.json` (`scripts/import-kmls.js`)
 - `npm run lint` — ESLint (flat config, `eslint.config.js`)
 - `npm run preview` — preview a production build
-
-No test suite is currently configured.
+- `npm test` — `node --test` over `src/lib/dates.test.js` (date parsing) and `mcp-server/tools.test.js` (MCP tools against an inline fixture CSV). No browser/React tests exist; these two files are the whole suite. They need root `node_modules` (papaparse) but not `mcp-server/node_modules` — the tool tests deliberately avoid the MCP SDK by calling the registered handlers directly.
+- `npm run auditar-fechas [url-o-fichero]` — runs `src/lib/dates.js` over every date cell of the live sheet (or a local CSV) and reports which values it can't parse and which it recovered as day/month-swapped. Use this after touching the parser, or when someone reports a wrong date: it names the territory and column to fix in the sheet.
 
 ### MCP server (`mcp-server/`)
 
@@ -46,7 +46,9 @@ Territory data comes from two places that are merged client-side, not at build t
 2. **Status/assignment data (Google Sheets)**: `src/lib/sheets.js` fetches a published Google Sheet as CSV at runtime (client-side fetch, not build-time) and parses it into territory records — status (`free`/`assigned`), current publisher, assignment history, and a computed "expired" flag (assigned ≥ ~4 months / 122 days ago). The sheet has a fixed column layout: `id, zone, numViviendas, status, lastCompletedDate`, followed by repeating groups of 3 columns (`publisher, assignedDate, completedDate`) representing assignment history over time.
 3. **Merge**: `src/lib/territories.js#mergeTerritoryData` joins the GeoJSON features to sheet rows by matching `feature.properties.name` (or an ID extracted from `sourceFile` via the `TERRITORIO (\d+)\.kml` pattern) against the sheet's `id` column. This merge happens in `App.jsx` on every data load, not as a build step — the sheet is the live source of truth for status, the KML is the live-enough source of truth for shape.
 
-The same sheet-parsing logic (`fetchTerritoryData`) is reused as-is by `mcp-server/data.js` (imported directly from `../src/lib/sheets.js`), so the MCP server and the web app share identical parsing/expiry logic. The MCP server adds a 60s in-memory cache on top.
+The same sheet-parsing logic (`fetchTerritoryData`) is reused as-is by `mcp-server/data.js` (imported directly from `../src/lib/sheets.js`), so the MCP server and the web app share identical parsing/expiry logic. The MCP server adds a 60s in-memory cache on top, and honours `TERRITORIOS_SHEET_URL` to point at a different CSV (used by the tests).
+
+**Dates are hand-typed and must go through `src/lib/dates.js`.** The sheet is filled in by hand, so the same column can hold `3/6/2026`, `03-06-26`, `2026-06-03`, `3 de junio de 2026`, a compact `03062026` or a spreadsheet serial number. `parseSheetDate` is the single tolerant parser (day-first convention, 2-digit years, swapped day/month recovery flagged as `ambigua`); `sheets.js` and every MCP tool use it. Don't add another inline `split('/')` date parse — that's exactly what this module replaced. The same file resolves relative ranges (`resolveRango`/`resolvePeriodo`/`resolveMes`), which is deliberate: the agent doesn't know today's date, so periods like "la semana pasada" are resolved server-side and echoed back as `rangoResuelto`.
 
 ### Auth & authorization (`src/context/AuthContext.jsx`)
 
@@ -77,7 +79,16 @@ Row Level Security policies use an `is_admin()` function with `SECURITY DEFINER`
 
 ### MCP server (`mcp-server/`)
 
-Read-only stdio MCP server (`@modelcontextprotocol/sdk`) exposing 4 tools: `territorios_listar`, `territorios_buscar_por_id`, `territorios_vencidos` (expired), `territorios_estadisticas`. It has its own `package.json`/`node_modules`, separate from the root app. Its only coupling to the main app is importing `fetchTerritoryData` from `src/lib/sheets.js` — keep that function's return shape stable, or update `mcp-server/data.js` and `mcp-server/index.js` accordingly. All tools are annotated `readOnlyHint: true` and must stay read-only (the sheet itself is never written to by this codebase).
+Read-only stdio MCP server (`@modelcontextprotocol/sdk`) exposing 8 tools, all defined in `mcp-server/tools.js` and shared with the remote HTTP endpoint (`api/mcp.js`):
+
+- **State**: `territorios_listar`, `territorios_buscar_por_id`, `territorios_vencidos` (assigned >4 months ago), `territorios_estadisticas`.
+- **Time**: `territorios_actividad` — what was assigned/completed in a date range, with `evento` (asignados/completados/ambos) and `agrupar` (mes/zona/publicador/territorio). When `agrupar !== 'ninguno'` it deliberately omits the event list and returns only group totals, to keep the answer inside Haiku's token budget.
+- **People**: `territorios_buscar_por_publicador` (everything about one publisher; `soloActuales` defaults to `true` only when no date filter is given), `publicadores_listar` (who exists, name resolution, ranking).
+- **Staleness**: `territorios_sin_trabajar` — longest since last completion, free or assigned. Not the same as `territorios_vencidos`; the tool descriptions say so explicitly because the model conflates them otherwise.
+
+`mcp-server/query.js` holds the shared query logic (event extraction from history, publisher indexing, pagination, output date formatting). Two invariants worth preserving: raw sheet strings never reach the output (`fechaNormalizada` emits ISO in `structuredContent`, `DD/MM/YYYY` in text, and says so explicitly when a date is unreadable), and publisher names are always cited via `nombreCanonico` so the same person isn't spelled two ways across answers.
+
+It has its own `package.json`/`node_modules`, separate from the root app. Its only coupling to the main app is importing `fetchTerritoryData` from `src/lib/sheets.js` and the helpers in `src/lib/dates.js` — keep those stable, or update `mcp-server/data.js`, `query.js` and `tools.js` accordingly. Note the zod version skew: `mcp-server/node_modules` has zod 4 but `api/mcp.js` resolves zod 3 from the root; stick to schema APIs valid in both. All tools are annotated `readOnlyHint: true` and must stay read-only (the sheet itself is never written to by this codebase).
 
 ## Notes
 

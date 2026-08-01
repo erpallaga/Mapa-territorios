@@ -19630,6 +19630,90 @@
         "coordinates": [
           [
             [
+              2.1141272,
+              41.3761206,
+              0
+            ],
+            [
+              2.1146107,
+              41.3763073,
+              0
+            ],
+            [
+              2.1153812,
+              41.3765916,
+              0
+            ],
+            [
+              2.1150285,
+              41.3771672,
+              0
+            ],
+            [
+              2.1144706,
+              41.3768895,
+              0
+            ],
+            [
+              2.1140039,
+              41.3763018,
+              0
+            ],
+            [
+              2.1141272,
+              41.3761206,
+              0
+            ]
+          ]
+        ]
+      },
+      "properties": {
+        "name": "ZONA LES CORTS",
+        "styleUrl": "#poly-000000-7721-92-nodesc",
+        "fill-opacity": 0.3607843137254902,
+        "fill": "#000000",
+        "stroke-opacity": 1,
+        "stroke": "#000000",
+        "stroke-width": 7.721,
+        "sourceFile": "TERRITORIO 70.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          2.11472,
+          41.3766399,
+          0
+        ]
+      },
+      "properties": {
+        "name": "COMO LLEGAR",
+        "styleUrl": "#icon-1899-0288D1-nodesc",
+        "label-scale": 0,
+        "icon-opacity": 1,
+        "icon-color": "#0288d1",
+        "icon-scale": 1,
+        "icon-offset": [
+          32,
+          64
+        ],
+        "icon-offset-units": [
+          "pixels",
+          "insetPixels"
+        ],
+        "icon": "https://www.gstatic.com/mapspro/images/stock/503-wht-blank_maps.png",
+        "sourceFile": "TERRITORIO 70.kml"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
               2.1160977,
               41.3781196,
               0
