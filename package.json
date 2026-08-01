@@ -8,6 +8,7 @@
     "build": "npm run import-kml && vite build",
     "lint": "eslint .",
     "test": "node --test src/lib/dates.test.js mcp-server/tools.test.js",
+    "auditar-fechas": "node scripts/auditar-fechas.mjs",
     "preview": "vite preview",
     "import-kml": "node scripts/import-kmls.js",
     "mcp-server": "node mcp-server/index.js"

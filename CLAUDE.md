@@ -16,6 +16,7 @@ Run from repo root unless noted.
 - `npm run lint` — ESLint (flat config, `eslint.config.js`)
 - `npm run preview` — preview a production build
 - `npm test` — `node --test` over `src/lib/dates.test.js` (date parsing) and `mcp-server/tools.test.js` (MCP tools against an inline fixture CSV). No browser/React tests exist; these two files are the whole suite. They need root `node_modules` (papaparse) but not `mcp-server/node_modules` — the tool tests deliberately avoid the MCP SDK by calling the registered handlers directly.
+- `npm run auditar-fechas [url-o-fichero]` — runs `src/lib/dates.js` over every date cell of the live sheet (or a local CSV) and reports which values it can't parse and which it recovered as day/month-swapped. Use this after touching the parser, or when someone reports a wrong date: it names the territory and column to fix in the sheet.
 
 ### MCP server (`mcp-server/`)
 

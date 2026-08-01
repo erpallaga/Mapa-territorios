@@ -102,6 +102,15 @@ npm test
 Cubre el parseo de fechas (`src/lib/dates.test.js`) y las tools contra un CSV de ejemplo con datos
 sucios a propósito (`mcp-server/tools.test.js`), sin tocar la red ni el Sheet real.
 
+Para comprobar el parser contra los datos **reales**:
+
+```bash
+npm run auditar-fechas
+```
+
+Recorre todas las celdas de fecha de la Sheet publicada y dice cuáles no entiende (con el
+territorio y la columna donde están) y cuáles ha recuperado por tener el día y el mes invertidos.
+
 ## Notas técnicas
 
 - Transporte local: **stdio**. Transporte remoto (`api/mcp.js`): **Streamable HTTP**, protegido con token compartido.
