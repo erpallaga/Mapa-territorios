@@ -157,6 +157,11 @@ export function AuthProvider({ children }) {
     )
 }
 
+// El hook vive aquí a propósito, junto al contexto que consume: separarlo en
+// otro fichero solo para contentar a react-refresh obligaría a tocar todos los
+// imports de la app. El coste es que el Fast Refresh de este fichero recarga el
+// módulo entero en vez de preservar el estado.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
     const context = useContext(AuthContext)
     if (!context) {

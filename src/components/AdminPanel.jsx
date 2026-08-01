@@ -137,7 +137,7 @@ function UsersTab() {
 
             const resultText = await response.text()
             let result;
-            try { result = JSON.parse(resultText) } catch (e) { result = { error: resultText } }
+            try { result = JSON.parse(resultText) } catch { result = { error: resultText } }
 
             if (!response.ok) {
                 throw new Error(`Detalle del backend: ${result.error || JSON.stringify(result)}`)
@@ -296,7 +296,7 @@ function InvitationsTab() {
         setMessage(null)
 
         try {
-            const { data: result, error: invokeError } = await supabase.functions.invoke('send-invitation', {
+            const { error: invokeError } = await supabase.functions.invoke('send-invitation', {
                 body: {
                     email: email.trim(),
                     role,
