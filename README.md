@@ -56,8 +56,8 @@ Se ha implementado una capa de seguridad y estabilidad superior para evitar los 
 ## 🤖 Consultas en Lenguaje Natural (MCP)
 
 El proyecto incluye un servidor MCP (Model Context Protocol) de solo lectura que expone el
-estado de los territorios (libres/asignados, vencidos, estadísticas por zona) como *tools*
-consultables en lenguaje natural:
+estado de los territorios (libres/asignados, vencidos, estadísticas por zona, actividad por
+fechas y por publicador) como *tools* consultables en lenguaje natural:
 
 - **`mcp-server/`**: servidor MCP local (stdio) para usar desde Claude Code/Desktop. Ver `mcp-server/README.md`.
 - **`api/mcp.js`**: el mismo servidor expuesto por HTTP en Vercel (protegido con un token compartido), para acceso remoto.
