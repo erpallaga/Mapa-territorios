@@ -1,12 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, BarChart, Bar } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, BarChart, Bar, LineChart, Line, Legend as RechartsLegend } from 'recharts';
 import {
     CATEGORIA_0_6,
     CATEGORIA_6_12,
     CATEGORIA_SIN_FECHA,
+    COBERTURA_CUBIERTO,
+    COBERTURA_EN_CURSO,
+    anyoServicioDe,
     categoria12m,
+    coberturaAnyoServicio,
     finalizacionesUltimos12Meses,
+    pasesEnAnyoServicio,
+    progresoAnyoServicio,
+    rangoAnyoServicio,
 } from '../lib/completion';
+import { addMonths, formatSheetDate } from '../lib/dates';
 
 // Expired color helper (el equivalente de color vive en Map.jsx, que es quien pinta)
 function getExpiredBucket(expiredDays) {
@@ -17,7 +25,7 @@ function getExpiredBucket(expiredDays) {
 }
 
 export function Dashboard({ territories }) {
-    const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
+    const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'serviceYear' | 'expired'
 
     // OJO: nada de returns antes de este useMemo. Si el hook se salta en el
     // render en que `territories` aún es null, React pierde el orden de los
@@ -159,6 +167,57 @@ export function Dashboard({ territories }) {
                     name: `${count} veces`,
                     territorios: frequencyMap[count]
                 }));
+        } else if (viewMode === 'serviceYear') {
+            // ─── Año de servicio (1 sep → 31 ago) ───────────────────────
+            // No es la ventana de 12 meses con otro nombre: aquí el periodo es
+            // cerrado y tiene fecha de corte, así que lo que importa es qué
+            // queda por cubrir antes del 31 de agosto.
+            const anyo = anyoServicioDe(hoy);
+            const rango = rangoAnyoServicio(anyo);
+
+            const cubiertos = [];
+            const enCurso = [];
+            const sinCubrir = [];
+            unique.forEach(t => {
+                const cob = coberturaAnyoServicio(t.properties, anyo, hoy);
+                if (cob === COBERTURA_CUBIERTO) cubiertos.push(t);
+                else if (cob === COBERTURA_EN_CURSO) enCurso.push(t);
+                else sinCubrir.push(t);
+            });
+
+            // "A la misma altura del año pasado": mismo día, un año antes.
+            const hoyAnyoPasado = addMonths(hoy, -12);
+            const cubiertosAnyoPasado = unique.filter(
+                t => pasesEnAnyoServicio(t.properties, anyo - 1, hoy, hoyAnyoPasado) > 0
+            ).length;
+            const delta = cubiertos.length - cubiertosAnyoPasado;
+
+            const pct = n => (total > 0 ? Math.round((n / total) * 100) : 0);
+
+            globalStats = {
+                cards: [
+                    { label: `Cubiertos (${rango.etiqueta})`, value: cubiertos.length, color: 'text-blue-600', percentage: pct(cubiertos.length) },
+                    { label: 'En curso (asignados)', value: enCurso.length, color: 'text-orange-500', percentage: pct(enCurso.length) },
+                    { label: 'Sin cubrir', value: sinCubrir.length, color: 'text-red-500', percentage: pct(sinCubrir.length) }
+                ],
+                anyoServicio: rango,
+                comparativa: { cubiertosAnyoPasado, delta, hasta: hoyAnyoPasado }
+            };
+
+            chartData = [
+                { name: `Cubiertos (${pct(cubiertos.length)}%)`, value: cubiertos.length, color: '#2563eb' },
+                { name: `En curso (${pct(enCurso.length)}%)`, value: enCurso.length, color: '#f59e0b' },
+                { name: `Sin cubrir (${pct(sinCubrir.length)}%)`, value: sinCubrir.length, color: '#ef4444' },
+            ].filter(d => d.value > 0);
+
+            // Progreso acumulado: año en curso contra el anterior, mes a mes.
+            const actual = progresoAnyoServicio(unique.map(t => t.properties), anyo, hoy);
+            const previo = progresoAnyoServicio(unique.map(t => t.properties), anyo - 1, hoy);
+            frequencyData = actual.map((punto, i) => ({
+                name: punto.mes,
+                actual: punto.valor,
+                anterior: previo[i]?.valor ?? null
+            }));
         } else {
             // ─── Expired View ───────────────────────────────────────────
             const assigned = unique.filter(t => t.properties.status === 'assigned');
@@ -225,6 +284,10 @@ export function Dashboard({ territories }) {
                     assigned12m: 0,
                     free12m: 0,
                     sinFecha12m: 0,
+                    // Año de servicio
+                    cubiertoAS: 0,
+                    enCursoAS: 0,
+                    sinCubrirAS: 0,
                     // Expired metrics
                     assignedCount: 0,
                     expiredCount: 0,
@@ -259,6 +322,12 @@ export function Dashboard({ territories }) {
                 z.free12m++;
             }
             if (sinFechaLegible(t)) z.sinFecha12m++;
+
+            // Año de servicio
+            const cob = coberturaAnyoServicio(t.properties, anyoServicioDe(hoy), hoy);
+            if (cob === COBERTURA_CUBIERTO) z.cubiertoAS++;
+            else if (cob === COBERTURA_EN_CURSO) z.enCursoAS++;
+            else z.sinCubrirAS++;
         });
 
         const zoneStatsArray = Object.values(zStats).sort((a, b) => a.name.localeCompare(b.name));
@@ -298,6 +367,15 @@ export function Dashboard({ territories }) {
                         12 meses
                     </button>
                     <button
+                        onClick={() => setViewMode('serviceYear')}
+                        className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'serviceYear'
+                            ? 'bg-white text-gray-900 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
+                            }`}
+                    >
+                        Año de servicio
+                    </button>
+                    <button
                         onClick={() => setViewMode('expired')}
                         className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${viewMode === 'expired'
                             ? 'bg-amber-600 text-white shadow-sm'
@@ -311,7 +389,7 @@ export function Dashboard({ territories }) {
 
             {/* Global Overview */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <div className={`grid grid-cols-1 gap-8 ${(viewMode === '12months' || viewMode === 'expired') ? 'xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-3'}`}>
+                <div className={`grid grid-cols-1 gap-8 ${viewMode !== 'current' ? 'xl:grid-cols-4 lg:grid-cols-3 md:grid-cols-2' : 'md:grid-cols-3'}`}>
                     <div className={`col-span-1 md:col-span-2 grid grid-cols-3 gap-4`}>
                         {stats.cards.map((card, idx) => (
                             <StatCard
@@ -373,6 +451,38 @@ export function Dashboard({ territories }) {
                             </ResponsiveContainer>
                         </div>
                     )}
+                    {viewMode === 'serviceYear' && frequencyData.length > 0 && (
+                        <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                Cobertura acumulada
+                            </h4>
+                            <ResponsiveContainer width="100%" height="85%">
+                                <LineChart data={frequencyData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                    <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval={1} />
+                                    <YAxis tick={{ fontSize: 12 }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <Tooltip />
+                                    <RechartsLegend wrapperStyle={{ fontSize: 11 }} iconType="plainline" />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="anterior"
+                                        name={stats.anyoServicio ? `${stats.anyoServicio.anyo - 1}/${String(stats.anyoServicio.anyo % 100).padStart(2, '0')}` : 'Año anterior'}
+                                        stroke="#cbd5e1"
+                                        strokeWidth={2}
+                                        dot={false}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="actual"
+                                        name={stats.anyoServicio?.etiqueta || 'En curso'}
+                                        stroke="#2563eb"
+                                        strokeWidth={2.5}
+                                        dot={{ r: 3 }}
+                                        connectNulls={false}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
                     {viewMode === 'expired' && frequencyData.length > 0 && (
                         <div className="h-[200px] xl:col-span-1 lg:col-span-3 md:col-span-2">
                             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Territorios Caducados</h4>
@@ -391,6 +501,19 @@ export function Dashboard({ territories }) {
                         </div>
                     )}
                 </div>
+                {viewMode === 'serviceYear' && stats.comparativa && (
+                    <p className="mt-4 text-xs text-gray-500">
+                        Año de servicio <strong>{stats.anyoServicio.etiqueta}</strong>: del{' '}
+                        {formatSheetDate(stats.anyoServicio.inicio)} al {formatSheetDate(stats.anyoServicio.fin)}.{' '}
+                        A la misma altura del año pasado ({formatSheetDate(stats.comparativa.hasta)}) había{' '}
+                        <strong>{stats.comparativa.cubiertosAnyoPasado}</strong> territorios cubiertos
+                        {stats.comparativa.delta === 0
+                            ? ', el mismo número que ahora.'
+                            : stats.comparativa.delta > 0
+                                ? `, ${stats.comparativa.delta} menos que ahora.`
+                                : `, ${Math.abs(stats.comparativa.delta)} más que ahora.`}
+                    </p>
+                )}
                 {viewMode === '12months' && stats.sinFecha > 0 && (
                     <p className="mt-4 text-xs text-gray-500">
                         {stats.sinFecha} {stats.sinFecha === 1 ? 'territorio no tiene' : 'territorios no tienen'} ninguna
@@ -455,6 +578,58 @@ function ZoneCard({ zone, mode }) {
                     </div>
                     <div className="text-left">
                         <span className="text-xs text-gray-500">{coverage}% Asignado</span>
+                    </div>
+                </div>
+            </div>
+        );
+    } else if (mode === 'serviceYear') {
+        // Año de servicio: lo accionable es cuántos quedan sin cubrir.
+        const cubiertoPct = zone.total > 0 ? Math.round((zone.cubiertoAS / zone.total) * 100) : 0;
+
+        return (
+            <div className="p-4 border border-gray-200 rounded-xl hover:border-blue-300 transition-colors bg-gray-50/50">
+                <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-gray-900">{zone.name}</h3>
+                    <span className="text-xs font-medium bg-gray-200 text-gray-700 px-2 py-1 rounded-full">
+                        {zone.total} Terr.
+                    </span>
+                </div>
+
+                <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div className="bg-blue-50 p-1.5 rounded flex flex-col justify-center">
+                            <div className="font-bold text-blue-600">{zone.cubiertoAS}</div>
+                            <div className="text-gray-500">Cubiertos</div>
+                        </div>
+                        <div className="bg-orange-50 p-1.5 rounded flex flex-col justify-center">
+                            <div className="font-bold text-orange-500">{zone.enCursoAS}</div>
+                            <div className="text-gray-500">En curso</div>
+                        </div>
+                        <div className="bg-red-50 p-1.5 rounded flex flex-col justify-center">
+                            <div className="font-bold text-red-500">{zone.sinCubrirAS}</div>
+                            <div className="text-gray-500">Sin cubrir</div>
+                        </div>
+                    </div>
+
+                    <div className="w-full bg-gray-200 rounded-full h-2.5 flex overflow-hidden">
+                        <div
+                            className="bg-blue-600 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.cubiertoAS / zone.total) * 100 : 0}%` }}
+                            title="Cubiertos"
+                        ></div>
+                        <div
+                            className="bg-amber-500 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.enCursoAS / zone.total) * 100 : 0}%` }}
+                            title="En curso"
+                        ></div>
+                        <div
+                            className="bg-red-500 h-2.5 transition-all duration-500"
+                            style={{ width: `${zone.total > 0 ? (zone.sinCubrirAS / zone.total) * 100 : 0}%` }}
+                            title="Sin cubrir"
+                        ></div>
+                    </div>
+                    <div className="text-left">
+                        <span className="text-xs text-gray-500">{cubiertoPct}% cubierto</span>
                     </div>
                 </div>
             </div>

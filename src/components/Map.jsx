@@ -3,7 +3,17 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-l
 import 'leaflet/dist/leaflet.css';
 import { cn } from '../lib/utils';
 import { calculateBounds, calculateFeatureCentroid } from '../lib/territories';
-import { CATEGORIA_MAS_12, CATEGORIA_SIN_FECHA, categoria12m, mesesDesdeFinalizacion } from '../lib/completion';
+import {
+    CATEGORIA_MAS_12,
+    CATEGORIA_SIN_FECHA,
+    COBERTURA_CUBIERTO,
+    COBERTURA_EN_CURSO,
+    anyoServicioDe,
+    categoria12m,
+    coberturaAnyoServicio,
+    mesesDesdeFinalizacion,
+    pasesEnAnyoServicio,
+} from '../lib/completion';
 import { Legend } from './Legend';
 
 // Fix for default Leaflet icon issues in React
@@ -67,6 +77,18 @@ function getColorForHistory(categoria, months, status) {
     if (months <= 6) return '#3b82f6';
     if (months <= 9) return '#1d4ed8';
     return '#1e3a8a';
+}
+
+// Color de la vista "año de servicio". El tono de azul dice cuántas veces se ha
+// pasado el territorio dentro del año; naranja y rojo son los dos tipos de
+// pendiente, que es lo que hay que poder localizar de un vistazo en el mapa.
+function getColorForServiceYear(cobertura, pases) {
+    if (cobertura === COBERTURA_CUBIERTO) {
+        if (pases >= 3) return '#1e3a8a';
+        if (pases === 2) return '#2563eb';
+        return '#60a5fa';
+    }
+    return cobertura === COBERTURA_EN_CURSO ? '#f59e0b' : '#ef4444';
 }
 
 export function Map({ territories, onTerritoryClick, selectedTerritory }) {
@@ -134,6 +156,16 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             if (categoria === CATEGORIA_MAS_12 || categoria === CATEGORIA_SIN_FECHA) {
                 fillOpacity = 0.7;
             }
+        } else if (viewMode === 'serviceYear') {
+            const hoy = new Date();
+            const anyo = anyoServicioDe(hoy);
+            const cobertura = coberturaAnyoServicio(feature?.properties, anyo, hoy);
+            const pases = pasesEnAnyoServicio(feature?.properties, anyo, hoy);
+            fillColor = getColorForServiceYear(cobertura, pases);
+            color = status === 'free' ? '#16a34a' : '#dc2626';
+            weight = 3;
+            dashArray = '';
+            if (cobertura !== COBERTURA_CUBIERTO) fillOpacity = 0.7;
         } else if (viewMode === 'expired') {
             const isExpired = feature?.properties?.isExpired;
             const expiredDays = feature?.properties?.expiredDays || 0;
@@ -198,7 +230,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 if (viewMode === 'expired' && !feature?.properties?.isExpired) return;
                 layer.setStyle({
                     weight: 4,
-                    color: viewMode === '12months'
+                    color: (viewMode === '12months' || viewMode === 'serviceYear')
                         ? (feature?.properties?.status === 'free' ? '#16a34a' : '#dc2626')
                         : '#666',
                     dashArray: '',
@@ -227,6 +259,17 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 if (!center) return null;
                 const count = feature.properties.completionCount12m || 0;
                 return { position: center, label: String(count), id: feature.properties.id };
+            }).filter(Boolean);
+        }
+
+        if (viewMode === 'serviceYear') {
+            const hoy = new Date();
+            const anyo = anyoServicioDe(hoy);
+            return filteredTerritories.features.map(feature => {
+                const center = calculateFeatureCentroid(feature);
+                if (!center) return null;
+                const pases = pasesEnAnyoServicio(feature.properties, anyo, hoy);
+                return { position: center, label: String(pases), id: feature.properties.id };
             }).filter(Boolean);
         }
 
@@ -324,6 +367,17 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                     12 meses
                 </button>
                 <button
+                    onClick={() => setViewMode('serviceYear')}
+                    className={cn(
+                        "px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-colors",
+                        viewMode === 'serviceYear'
+                            ? "bg-gray-900 text-white shadow-sm"
+                            : "text-gray-600 hover:bg-gray-100"
+                    )}
+                >
+                    Año servicio
+                </button>
+                <button
                     onClick={() => setViewMode('expired')}
                     className={cn(
                         "px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-md transition-colors",
@@ -358,7 +412,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                 )}
 
                 {/* Render Badges */}
-                {(viewMode === '12months' || viewMode === 'expired') && badgeMarkers.map((marker) => (
+                {viewMode !== 'current' && badgeMarkers.map((marker) => (
                     <Marker
                         key={`${viewMode}-${marker.id}`}
                         position={marker.position}

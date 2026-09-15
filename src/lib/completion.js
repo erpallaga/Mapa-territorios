@@ -136,3 +136,123 @@ export function finalizacionesUltimos12Meses(territorio, hoy = new Date()) {
     }
     return n;
 }
+
+// ─── Año de servicio ────────────────────────────────────────────────────────
+//
+// El año de servicio va del 1 de septiembre al 31 de agosto. A diferencia de la
+// ventana móvil de 12 meses ("¿algún territorio lleva demasiado sin tocarse?"),
+// es un periodo cerrado con fecha de corte: "¿cerramos el año con todo
+// cubierto?". Por eso las dos vistas conviven en vez de sustituirse.
+
+/** Septiembre, 0-indexado: el mes en que arranca el año de servicio. */
+export const MES_INICIO_ANYO_SERVICIO = 8;
+
+export const COBERTURA_CUBIERTO = 'cubierto';
+export const COBERTURA_EN_CURSO = 'en-curso';
+export const COBERTURA_SIN_CUBRIR = 'sin-cubrir';
+
+/** Año de servicio al que pertenece una fecha: 15/09/2026 y 31/08/2027 son ambos 2026. */
+export function anyoServicioDe(date) {
+    return date.getMonth() >= MES_INICIO_ANYO_SERVICIO ? date.getFullYear() : date.getFullYear() - 1;
+}
+
+/** Límites y etiqueta de un año de servicio. `fin` es el 31 de agosto siguiente. */
+export function rangoAnyoServicio(anyo) {
+    return {
+        anyo,
+        inicio: new Date(anyo, MES_INICIO_ANYO_SERVICIO, 1),
+        // Día 0 del mes de inicio del año siguiente = su último día, sin contar agostos a mano.
+        fin: new Date(anyo + 1, MES_INICIO_ANYO_SERVICIO, 0),
+        etiqueta: `${anyo}/${String((anyo + 1) % 100).padStart(2, '0')}`,
+    };
+}
+
+/**
+ * Fechas en que consta completado un territorio, de la más antigua a la más
+ * reciente, sin repeticiones y sin las posteriores a hoy.
+ *
+ * Une la columna "última fecha en que se completó" con el historial porque
+ * cualquiera de las dos puede ir por delante, y deduplica por día: lo normal es
+ * que la columna repita la última fila del historial, y contarla dos veces
+ * inflaría la cobertura.
+ *
+ * Ojo: no es lo mismo que `finalizacionesUltimos12Meses`, que cuenta solo
+ * eventos del historial a propósito, para que `auditar-12m` pueda detectar los
+ * territorios que constan trabajados únicamente por la columna.
+ */
+export function fechasFinalizacion(territorio, hoy = new Date()) {
+    const limite = startOfDay(hoy);
+    const vistas = new Set();
+    const fechas = [];
+
+    const anotar = (raw) => {
+        const d = parseSheetDate(raw);
+        if (!d) return;
+        const dia = startOfDay(d);
+        if (dia > limite) return; // fecha futura: errata de año, no una finalización
+        const clave = dia.getTime();
+        if (vistas.has(clave)) return;
+        vistas.add(clave);
+        fechas.push(dia);
+    };
+
+    anotar(territorio?.lastCompletedDate);
+    for (const h of territorio?.history || []) anotar(h?.completedDate);
+
+    fechas.sort((a, b) => a - b);
+    return fechas;
+}
+
+/**
+ * Veces que se completó el territorio dentro de un año de servicio.
+ * @param {number} [anyo] - por defecto, el año de servicio en curso.
+ * @param {Date} [hasta] - corta el recuento en esta fecha (para comparar "a la
+ *   misma altura" del año pasado). Por defecto, hoy.
+ */
+export function pasesEnAnyoServicio(territorio, anyo, hoy = new Date(), hasta = null) {
+    const { inicio, fin } = rangoAnyoServicio(anyo ?? anyoServicioDe(hoy));
+    const tope = hasta ? startOfDay(hasta) : fin;
+    return fechasFinalizacion(territorio, hoy).filter((d) => d >= inicio && d <= fin && d <= tope).length;
+}
+
+/**
+ * Estado de cobertura de un territorio en el año de servicio.
+ *
+ * - `cubierto`: se completó al menos una vez dentro del año.
+ * - `en-curso`: todavía no, pero alguien lo tiene asignado ahora mismo.
+ * - `sin-cubrir`: ni lo uno ni lo otro. Es la lista de trabajo pendiente.
+ */
+export function coberturaAnyoServicio(territorio, anyo, hoy = new Date(), hasta = null) {
+    if (pasesEnAnyoServicio(territorio, anyo, hoy, hasta) > 0) return COBERTURA_CUBIERTO;
+    return territorio?.status === 'assigned' ? COBERTURA_EN_CURSO : COBERTURA_SIN_CUBRIR;
+}
+
+export const MESES_ANYO_SERVICIO = ['Sep', 'Oct', 'Nov', 'Dic', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago'];
+
+/**
+ * Cobertura acumulada mes a mes, de septiembre a agosto, para el gráfico de
+ * progreso. Cada punto es "cuántos territorios distintos llevábamos cubiertos al
+ * acabar ese mes" (o a día de hoy, si el mes está en curso). Los meses que aún
+ * no han empezado valen `null`, no cero: la línea del año en curso se corta en
+ * el mes actual en vez de desplomarse y fingir que no se ha trabajado nada.
+ */
+export function progresoAnyoServicio(territorios, anyo, hoy = new Date()) {
+    const { inicio, fin } = rangoAnyoServicio(anyo);
+    const cubiertosPorMes = new Array(12).fill(0);
+
+    for (const t of territorios) {
+        // Solo cuenta el primer pase: esto es "territorios cubiertos", no "pases".
+        const primera = fechasFinalizacion(t, hoy).find((d) => d >= inicio && d <= fin);
+        if (!primera) continue;
+        const indice = (primera.getMonth() - MES_INICIO_ANYO_SERVICIO + 12) % 12;
+        cubiertosPorMes[indice]++;
+    }
+
+    const hoy0 = startOfDay(hoy);
+    let acumulado = 0;
+    return cubiertosPorMes.map((n, i) => {
+        acumulado += n;
+        const inicioMes = addMonths(inicio, i);
+        return { mes: MESES_ANYO_SERVICIO[i], valor: inicioMes > hoy0 ? null : acumulado };
+    });
+}

@@ -17,6 +17,15 @@ import {
     mesesDesdeFinalizacion,
     trabajadoUltimos12Meses,
     ultimaFinalizacionDetallada,
+    COBERTURA_CUBIERTO,
+    COBERTURA_EN_CURSO,
+    COBERTURA_SIN_CUBRIR,
+    anyoServicioDe,
+    coberturaAnyoServicio,
+    fechasFinalizacion,
+    pasesEnAnyoServicio,
+    progresoAnyoServicio,
+    rangoAnyoServicio,
 } from './completion.js';
 
 const HOY = new Date(2026, 8, 15); // 15/09/2026
@@ -99,4 +108,72 @@ test('acepta un territorio sin historial sin reventar', () => {
     assert.equal(categoria12m({ lastCompletedDate: '15/03/2026' }, HOY), CATEGORIA_0_6);
     assert.equal(categoria12m({}, HOY), CATEGORIA_SIN_FECHA);
     assert.equal(categoria12m(undefined, HOY), CATEGORIA_SIN_FECHA);
+});
+
+// ─── Año de servicio ────────────────────────────────────────────────────────
+
+test('el año de servicio va del 1 de septiembre al 31 de agosto', () => {
+    assert.equal(anyoServicioDe(new Date(2026, 8, 1)), 2026); // 1 sep 2026 -> 2026/27
+    assert.equal(anyoServicioDe(new Date(2027, 7, 31)), 2026); // 31 ago 2027 -> todavía 2026/27
+    assert.equal(anyoServicioDe(new Date(2026, 7, 31)), 2025); // 31 ago 2026 -> 2025/26
+
+    const r = rangoAnyoServicio(2026);
+    assert.equal(r.etiqueta, '2026/27');
+    assert.deepEqual(r.inicio, new Date(2026, 8, 1));
+    assert.deepEqual(r.fin, new Date(2027, 7, 31));
+});
+
+test('cuenta los pases dentro del año de servicio, no fuera', () => {
+    const t = territorio('12/09/2026', ['20/08/2026', '12/09/2026', '13/06/2026']);
+    assert.equal(pasesEnAnyoServicio(t, 2026, HOY), 1); // solo el 12/09/2026
+    assert.equal(pasesEnAnyoServicio(t, 2025, HOY), 2); // 13/06 y 20/08, ambos en 2025/26
+});
+
+test('la columna y el historial no cuentan dos veces el mismo día', () => {
+    // El caso normal: la columna repite la última fila del historial.
+    const t = territorio('12/09/2026', ['12/09/2026']);
+    assert.deepEqual(fechasFinalizacion(t, HOY), [new Date(2026, 8, 12)]);
+    assert.equal(pasesEnAnyoServicio(t, 2026, HOY), 1);
+});
+
+test('la cobertura distingue lo pendiente asignado de lo pendiente sin asignar', () => {
+    const cubierto = { ...territorio('12/09/2026', ['12/09/2026']), status: 'free' };
+    const enCurso = { ...territorio('13/06/2026', ['13/06/2026']), status: 'assigned' };
+    const sinCubrir = { ...territorio('13/06/2026', ['13/06/2026']), status: 'free' };
+
+    assert.equal(coberturaAnyoServicio(cubierto, 2026, HOY), COBERTURA_CUBIERTO);
+    assert.equal(coberturaAnyoServicio(enCurso, 2026, HOY), COBERTURA_EN_CURSO);
+    assert.equal(coberturaAnyoServicio(sinCubrir, 2026, HOY), COBERTURA_SIN_CUBRIR);
+});
+
+test('el corte "a la misma altura del año pasado" recorta el recuento', () => {
+    const t = territorio('13/06/2026', ['13/06/2026']);
+    // El año 2025/26 entero incluye el 13/06/2026...
+    assert.equal(pasesEnAnyoServicio(t, 2025, HOY), 1);
+    // ...pero a 15/09/2025 todavía no había pasado.
+    assert.equal(pasesEnAnyoServicio(t, 2025, HOY, new Date(2025, 8, 15)), 0);
+});
+
+test('el progreso acumulado corta en el mes en curso', () => {
+    const ts = [territorio('12/09/2026', ['12/09/2026'])];
+    const p = progresoAnyoServicio(ts, 2026, HOY);
+    assert.equal(p.length, 12);
+    assert.deepEqual(p[0], { mes: 'Sep', valor: 1 });
+    // Octubre todavía no ha empezado: es "aún no se sabe", no "cero".
+    assert.equal(p[1].valor, null);
+    assert.equal(p[11].valor, null);
+});
+
+test('el progreso acumulado de un año cerrado no tiene huecos', () => {
+    const ts = [territorio('13/06/2026', ['13/06/2026']), territorio('20/08/2026', ['20/08/2026'])];
+    const p = progresoAnyoServicio(ts, 2025, HOY);
+    assert.equal(p[0].valor, 0);   // septiembre 2025
+    assert.equal(p[9].valor, 1);   // junio 2026
+    assert.equal(p[11].valor, 2);  // agosto 2026, ya cerrado
+});
+
+test('una fecha futura tampoco cubre el año de servicio', () => {
+    const t = { ...territorio('01/01/2027', []), status: 'free' };
+    assert.equal(pasesEnAnyoServicio(t, 2026, HOY), 0);
+    assert.equal(coberturaAnyoServicio(t, 2026, HOY), COBERTURA_SIN_CUBRIR);
 });
