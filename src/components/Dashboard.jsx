@@ -1,6 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, AreaChart, Area, XAxis, YAxis, BarChart, Bar } from 'recharts';
-import { parseSheetDate } from '../lib/dates';
+import {
+    CATEGORIA_0_6,
+    CATEGORIA_6_12,
+    CATEGORIA_SIN_FECHA,
+    categoria12m,
+    finalizacionesUltimos12Meses,
+} from '../lib/completion';
 
 // Expired color helper (el equivalente de color vive en Map.jsx, que es quien pinta)
 function getExpiredBucket(expiredDays) {
@@ -31,20 +37,23 @@ export function Dashboard({ territories }) {
         const unique = Array.from(uniqueMap.values());
         const total = unique.length;
 
-        // Helper to check if worked in last 12 months
-        const oneYearAgo = new Date();
-        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-
-        const sixMonthsAgo = new Date();
-        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
+        // "Trabajado en los últimos 12 meses" se decide en `lib/completion.js`,
+        // que es de donde tiran también el mapa y el MCP. Aquí no se vuelve a
+        // interpretar ninguna fecha a mano: cuando esto se hacía en local, el
+        // panel miraba solo la columna "última fecha en que se completó" y el
+        // gráfico de frecuencia de al lado miraba solo el historial, así que
+        // podían contradecirse en la misma pantalla.
+        const hoy = new Date();
         const getWorkedCategory = (t) => {
-            const date = parseSheetDate(t.properties.lastCompletedDate);
-            if (!date) return null;
-            if (date >= sixMonthsAgo) return '0-6';
-            if (date >= oneYearAgo) return '6-12';
-            return null;
+            const cat = categoria12m(t.properties, hoy);
+            return cat === CATEGORIA_0_6 || cat === CATEGORIA_6_12 ? cat : null;
         };
+        const sinFechaLegible = (t) => categoria12m(t.properties, hoy) === CATEGORIA_SIN_FECHA;
+
+        // Territorios que no constan trabajados porque en la hoja no hay ninguna
+        // fecha de finalización legible (ni en la columna ni en el historial).
+        // No es lo mismo que "hace más de 12 meses" y conviene que se vea.
+        const sinFechaTotal = unique.filter(sinFechaLegible).length;
 
         // Global Stats Calculation
         let globalStats = {};
@@ -112,7 +121,8 @@ export function Dashboard({ territories }) {
                     { label: labelTrabajados, value: workedTotal, color: 'text-blue-600', percentage: workedPct },
                     { label: 'Asignados (>12m)', value: assignedTotal, color: 'text-orange-500', percentage: assignedPct },
                     { label: 'Libres (>12m o nunca)', value: freeTotal, color: 'text-red-500', percentage: freePct }
-                ]
+                ],
+                sinFecha: sinFechaTotal
             };
 
             const workedSlices = [];
@@ -137,7 +147,8 @@ export function Dashboard({ territories }) {
 
             const frequencyMap = {};
             unique.forEach(t => {
-                const count = t.properties.completionCount12m || 0;
+                const count = t.properties.completionCount12m
+                    ?? finalizacionesUltimos12Meses(t.properties, hoy);
                 frequencyMap[count] = (frequencyMap[count] || 0) + 1;
             });
 
@@ -213,6 +224,7 @@ export function Dashboard({ territories }) {
                     w612: 0,
                     assigned12m: 0,
                     free12m: 0,
+                    sinFecha12m: 0,
                     // Expired metrics
                     assignedCount: 0,
                     expiredCount: 0,
@@ -246,6 +258,7 @@ export function Dashboard({ territories }) {
             } else {
                 z.free12m++;
             }
+            if (sinFechaLegible(t)) z.sinFecha12m++;
         });
 
         const zoneStatsArray = Object.values(zStats).sort((a, b) => a.name.localeCompare(b.name));
@@ -378,6 +391,14 @@ export function Dashboard({ territories }) {
                         </div>
                     )}
                 </div>
+                {viewMode === '12months' && stats.sinFecha > 0 && (
+                    <p className="mt-4 text-xs text-gray-500">
+                        {stats.sinFecha} {stats.sinFecha === 1 ? 'territorio no tiene' : 'territorios no tienen'} ninguna
+                        fecha de finalización legible en la hoja (ni en la columna «última fecha en que se completó» ni en
+                        el historial). {stats.sinFecha === 1 ? 'Cuenta' : 'Cuentan'} como no trabajado en 12 meses; para ver
+                        cuáles, ejecuta <code className="font-mono">npm run auditar-12m</code>.
+                    </p>
+                )}
             </div>
             {/* Zone Breakdown */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

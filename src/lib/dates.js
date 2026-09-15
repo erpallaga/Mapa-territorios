@@ -178,7 +178,8 @@ function startOfWeek(date) {
     return d;
 }
 
-function addMonths(date, months) {
+/** Suma (o resta) meses sin desbordar al mes siguiente. */
+export function addMonths(date, months) {
     const d = new Date(date.getTime());
     const targetDay = d.getDate();
     d.setDate(1);

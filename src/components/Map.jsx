@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, GeoJSON, useMap, Marker, Popup } from 'react-l
 import 'leaflet/dist/leaflet.css';
 import { cn } from '../lib/utils';
 import { calculateBounds, calculateFeatureCentroid } from '../lib/territories';
-import { parseSheetDate } from '../lib/dates';
+import { CATEGORIA_MAS_12, CATEGORIA_SIN_FECHA, categoria12m, mesesDesdeFinalizacion } from '../lib/completion';
 import { Legend } from './Legend';
 
 // Fix for default Leaflet icon issues in React
@@ -52,27 +52,15 @@ function getExpiredColorDot(expiredDays) {
     return '🔴';
 }
 
-// Helper to calculate months since last worked
-function getMonthsSinceWorked(dateStr) {
-    const lastWorked = parseSheetDate(dateStr);
-    if (!lastWorked) return Infinity;
-
-    const now = new Date();
-
-    const diffTime = Math.abs(now - lastWorked);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    const diffMonths = diffDays / 30.44;
-
-    return diffMonths;
-}
-
-// Helper to get color for history view
-function getColorForHistory(months, status) {
-    if (months > 12) {
-        if (status === 'assigned') {
-            return '#f59e0b';
-        }
-        return '#ef4444';
+// Color de la vista "12 meses".
+//
+// El corte de los 12 meses lo decide `categoria12m` (fechas completas), no el
+// número de meses aproximado: así el mapa y el panel no discrepan en un
+// territorio que cae justo en el límite. `months` solo elige el tono dentro de
+// los que sí constan trabajados.
+function getColorForHistory(categoria, months, status) {
+    if (categoria === CATEGORIA_MAS_12 || categoria === CATEGORIA_SIN_FECHA) {
+        return status === 'assigned' ? '#f59e0b' : '#ef4444';
     }
 
     if (months <= 3) return '#93c5fd';
@@ -120,7 +108,6 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     // Style function for polygons
     const style = useCallback((feature) => {
         const status = feature?.properties?.status;
-        const lastCompletedDate = feature?.properties?.lastCompletedDate;
         const featureId = feature?.properties?.id;
 
         let fillColor = '#9ca3af';
@@ -132,12 +119,19 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         if (viewMode === 'current') {
             fillColor = status === 'free' ? '#22c55e' : '#ef4444';
         } else if (viewMode === '12months') {
-            const months = getMonthsSinceWorked(lastCompletedDate);
-            fillColor = getColorForHistory(months, status);
+            // Mismo criterio que el panel: `lib/completion.js` cruza la columna
+            // "última fecha en que se completó" con el historial y descarta las
+            // fechas posteriores a hoy. Antes esto se calculaba aquí con
+            // `Math.abs`, de modo que una errata de año (2027) se pintaba como
+            // recién trabajado en vez de destacarse.
+            const hoy = new Date();
+            const categoria = categoria12m(feature?.properties, hoy);
+            const months = mesesDesdeFinalizacion(feature?.properties, hoy);
+            fillColor = getColorForHistory(categoria, months, status);
             color = status === 'free' ? '#16a34a' : '#dc2626';
             weight = 3;
             dashArray = '';
-            if (months > 12) {
+            if (categoria === CATEGORIA_MAS_12 || categoria === CATEGORIA_SIN_FECHA) {
                 fillOpacity = 0.7;
             }
         } else if (viewMode === 'expired') {

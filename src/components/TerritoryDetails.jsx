@@ -1,9 +1,28 @@
 import React from 'react';
 import { X, Calendar, User, MapPin, Hash, History, Home } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { formatSheetDate, parseSheetDate } from '../lib/dates';
+import { ultimaFinalizacionDetallada } from '../lib/completion';
+
+/**
+ * Muestra una fecha de la hoja ya interpretada. Si no hay manera de leerla, lo
+ * dice en vez de enseñar la celda en crudo ("45810", "pendiente"), que es lo
+ * que hacía antes y llevaba a pensar que el dato estaba bien.
+ */
+function fechaLegible(raw) {
+    const valor = String(raw ?? '').trim();
+    if (!valor) return '-';
+    const fecha = parseSheetDate(valor);
+    return fecha ? formatSheetDate(fecha) : `${valor} (no se entiende como fecha)`;
+}
 
 export function TerritoryDetails({ territory, onClose, isOpen }) {
     if (!territory) return null;
+
+    // La misma fecha que usan el mapa y el panel para decidir si está trabajado:
+    // el máximo entre esta columna y el historial. Si el historial va por
+    // delante, se ve aquí en vez de quedarse escondido.
+    const finalizacion = ultimaFinalizacionDetallada(territory);
 
     return (
         <div
@@ -61,13 +80,20 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                         <DetailRow
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
                             label="Fecha de Inicio"
-                            value={territory.status === 'free' ? '-' : (territory.assignedDate || '-')}
+                            value={territory.status === 'free' ? '-' : fechaLegible(territory.assignedDate)}
                         />
                         <DetailRow
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
                             label="Última fecha en que se completó"
-                            value={territory.lastCompletedDate || '-'}
+                            value={fechaLegible(territory.lastCompletedDate)}
                         />
+                        {finalizacion.fuente === 'historial' && (
+                            <DetailRow
+                                icon={<Calendar className="w-5 h-5 text-blue-400" />}
+                                label="Última finalización según el historial"
+                                value={`${formatSheetDate(finalizacion.date)} (la columna está sin actualizar)`}
+                            />
+                        )}
                         <DetailRow
                             icon={<History className="w-5 h-5 text-gray-400" />}
                             label="Veces trabajado (12 meses)"
@@ -90,11 +116,11 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                                             <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="w-3 h-3" />
-                                                    <span>Desde: {record.assignedDate || '-'}</span>
+                                                    <span>Desde: {fechaLegible(record.assignedDate)}</span>
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="w-3 h-3" />
-                                                    <span>Hasta: {record.completedDate || '-'}</span>
+                                                    <span>Hasta: {fechaLegible(record.completedDate)}</span>
                                                 </span>
                                             </div>
                                         </div>

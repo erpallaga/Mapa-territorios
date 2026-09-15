@@ -8,11 +8,15 @@ export function Legend({ viewMode, expiredListExpanded }) {
             { color: '#ef4444', label: 'Asignado' }
         ]
         : viewMode === '12months'
+            // Los cuatro azules son los que pinta `getColorForHistory` en Map.jsx:
+            // la leyenda solo enseñaba dos de ellos.
             ? [
-                { color: '#93c5fd', label: '0-6 meses' },
-                { color: '#1e3a8a', label: '6-12 meses' },
-                { color: '#f59e0b', label: 'Asignado (>12m)' },
-                { color: '#ef4444', label: 'Sin trabajar (>12m)' }
+                { color: '#93c5fd', label: '0-3 meses' },
+                { color: '#3b82f6', label: '3-6 meses' },
+                { color: '#1d4ed8', label: '6-9 meses' },
+                { color: '#1e3a8a', label: '9-12 meses' },
+                { color: '#f59e0b', label: 'Asignado, >12m o sin fecha' },
+                { color: '#ef4444', label: 'Libre, >12m o sin fecha' }
             ]
             : [
                 // Expired mode — days past the 4-month mark
