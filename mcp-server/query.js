@@ -16,6 +16,7 @@ import {
     parseSheetDate,
     parseSheetDateDetailed,
 } from "../src/lib/dates.js";
+import { ultimaFinalizacion } from "../src/lib/completion.js";
 
 /** Coincidencia parcial sin distinguir mayúsculas ni acentos ("nuria" encuentra "Núria"). */
 export function coincideTexto(valor, aguja) {
@@ -123,18 +124,11 @@ export function nombreCanonico(indice, publisher) {
 }
 
 /**
- * Última vez que un territorio se completó, mirando tanto la columna
- * "última fecha en que se completó" como el historial: en un Sheet a mano
- * cualquiera de las dos puede estar más al día que la otra.
+ * Última vez que un territorio se completó. La implementación vive en
+ * `src/lib/completion.js` para que el MCP, el mapa y el panel contesten lo
+ * mismo; se reexporta aquí porque es como la conocen las tools.
  */
-export function ultimaFinalizacion(territorio) {
-    let mejor = parseSheetDate(territorio.lastCompletedDate);
-    for (const h of territorio.history) {
-        const d = parseSheetDate(h.completedDate);
-        if (d && (!mejor || d > mejor)) mejor = d;
-    }
-    return mejor;
-}
+export { ultimaFinalizacion };
 
 /** Media de días entre asignación y finalización, sobre las asignaciones ya cerradas. */
 export function diasMediosRetencion(entradas) {

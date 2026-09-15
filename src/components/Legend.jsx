@@ -2,26 +2,39 @@ import React from 'react';
 import { cn } from '../lib/utils';
 
 export function Legend({ viewMode, expiredListExpanded }) {
-    const items = viewMode === 'current'
-        ? [
+    // Cada vista pinta con su propia escala; la leyenda tiene que enumerar
+    // exactamente los colores que `Map.jsx` puede llegar a poner.
+    const itemsPorVista = {
+        current: [
             { color: '#22c55e', label: 'Libre' },
             { color: '#ef4444', label: 'Asignado' }
+        ],
+        '12months': [
+            { color: '#93c5fd', label: '0-3 meses' },
+            { color: '#3b82f6', label: '3-6 meses' },
+            { color: '#1d4ed8', label: '6-9 meses' },
+            { color: '#1e3a8a', label: '9-12 meses' },
+            { color: '#f59e0b', label: 'Asignado, >12m o sin fecha' },
+            { color: '#ef4444', label: 'Libre, >12m o sin fecha' }
+        ],
+        serviceYear: [
+            { color: '#60a5fa', label: 'Cubierto (1 pase)' },
+            { color: '#2563eb', label: 'Cubierto (2 pases)' },
+            { color: '#1e3a8a', label: 'Cubierto (3+ pases)' },
+            { color: '#f59e0b', label: 'En curso (asignado)' },
+            { color: '#ef4444', label: 'Sin cubrir' }
+        ],
+        expired: [
+            // Días pasados desde el límite de los 4 meses
+            { color: '#fbbf24', label: '< 1 mes' },
+            { color: '#f97316', label: '1-3 meses' },
+            { color: '#ef4444', label: '3-6 meses' },
+            { color: '#991b1b', label: '> 6 meses' },
+            { color: '#9ca3af', label: 'No caducado', opacity: 0.5 }
         ]
-        : viewMode === '12months'
-            ? [
-                { color: '#93c5fd', label: '0-6 meses' },
-                { color: '#1e3a8a', label: '6-12 meses' },
-                { color: '#f59e0b', label: 'Asignado (>12m)' },
-                { color: '#ef4444', label: 'Sin trabajar (>12m)' }
-            ]
-            : [
-                // Expired mode — days past the 4-month mark
-                { color: '#fbbf24', label: '< 1 mes' },
-                { color: '#f97316', label: '1-3 meses' },
-                { color: '#ef4444', label: '3-6 meses' },
-                { color: '#991b1b', label: '> 6 meses' },
-                { color: '#9ca3af', label: 'No caducado', opacity: 0.5 }
-            ];
+    };
+
+    const items = itemsPorVista[viewMode] || itemsPorVista.current;
 
     // Position logic:
     // - current / 12months: same as collapsed expired
