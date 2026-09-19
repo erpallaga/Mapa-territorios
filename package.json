@@ -12,7 +12,8 @@
     "auditar-12m": "node scripts/auditar-12m.mjs",
     "preview": "vite preview",
     "import-kml": "node scripts/import-kmls.js",
-    "mcp-server": "node mcp-server/index.js"
+    "mcp-server": "node mcp-server/index.js",
+    "auditar-trazas": "node --env-file=.env scripts/auditar-trazas.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",
