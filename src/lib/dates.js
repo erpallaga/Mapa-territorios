@@ -190,6 +190,32 @@ export function addMonths(date, months) {
     return d;
 }
 
+// ─── Año de servicio ────────────────────────────────────────────────────────
+//
+// Vive aquí, y no en `completion.js`, porque es aritmética de calendario y
+// porque `resolvePeriodo` (más abajo) la necesita: si estuviera allí, `dates.js`
+// tendría que importar de `completion.js`, que ya importa de `dates.js`.
+// `completion.js` la reexporta, así que quien la importaba de allí sigue igual.
+
+/** Septiembre, 0-indexado: el mes en que arranca el año de servicio. */
+export const MES_INICIO_ANYO_SERVICIO = 8;
+
+/** Año de servicio al que pertenece una fecha: 15/09/2026 y 31/08/2027 son ambos 2026. */
+export function anyoServicioDe(date) {
+    return date.getMonth() >= MES_INICIO_ANYO_SERVICIO ? date.getFullYear() : date.getFullYear() - 1;
+}
+
+/** Límites y etiqueta de un año de servicio. `fin` es el 31 de agosto siguiente. */
+export function rangoAnyoServicio(anyo) {
+    return {
+        anyo,
+        inicio: new Date(anyo, MES_INICIO_ANYO_SERVICIO, 1),
+        // Día 0 del mes de inicio del año siguiente = su último día, sin contar agostos a mano.
+        fin: new Date(anyo + 1, MES_INICIO_ANYO_SERVICIO, 0),
+        etiqueta: `${anyo}/${String((anyo + 1) % 100).padStart(2, '0')}`,
+    };
+}
+
 /** Periodos relativos que el servidor resuelve por su cuenta: el agente no necesita saber qué día es hoy. */
 export const PERIODOS = [
     'hoy',
@@ -205,6 +231,8 @@ export const PERIODOS = [
     'ultimo_ano',
     'este_ano',
     'ano_pasado',
+    'anyo_servicio',
+    'anyo_servicio_pasado',
 ];
 
 export function resolvePeriodo(periodo, now = new Date()) {
@@ -260,6 +288,18 @@ export function resolvePeriodo(periodo, now = new Date()) {
         case 'ano_pasado': {
             const y = hoy.getFullYear() - 1;
             return { desde: new Date(y, 0, 1), hasta: endOfDay(new Date(y, 11, 31)), etiqueta: `${y}` };
+        }
+        // El año de servicio no es el año natural: va del 1 de septiembre al 31
+        // de agosto. Preguntar "¿qué llevamos este año?" en septiembre y que se
+        // mire desde el 1 de enero es mirar casi entero el año anterior.
+        case 'anyo_servicio': {
+            const r = rangoAnyoServicio(anyoServicioDe(hoy));
+            // En curso: se corta hoy, igual que 'este_mes' y 'este_ano'.
+            return { desde: r.inicio, hasta: endOfDay(hoy), etiqueta: `el año de servicio ${r.etiqueta}` };
+        }
+        case 'anyo_servicio_pasado': {
+            const r = rangoAnyoServicio(anyoServicioDe(hoy) - 1);
+            return { desde: r.inicio, hasta: endOfDay(r.fin), etiqueta: `el año de servicio ${r.etiqueta}` };
         }
         default:
             return null;

@@ -23,7 +23,22 @@
  *     dejar que ascienda al territorio a "trabajado hace 0-6 meses".
  */
 
-import { addMonths, daysBetween, parseSheetDate, startOfDay } from './dates.js';
+import {
+    MES_INICIO_ANYO_SERVICIO,
+    addMonths,
+    anyoServicioDe,
+    daysBetween,
+    parseSheetDate,
+    rangoAnyoServicio,
+    startOfDay,
+} from './dates.js';
+
+// Los límites del año de servicio son aritmética de calendario y viven en
+// `dates.js`, que es quien los necesita para resolver el periodo
+// 'anyo_servicio'. Se reexportan aquí porque este módulo sigue siendo el sitio
+// donde se explica qué es el año de servicio y en qué se diferencia de la
+// ventana móvil de 12 meses.
+export { MES_INICIO_ANYO_SERVICIO, anyoServicioDe, rangoAnyoServicio } from './dates.js';
 
 /** Categorías de la vista "12 meses", en el orden en que se presentan. */
 export const CATEGORIA_0_6 = '0-6';
@@ -144,28 +159,9 @@ export function finalizacionesUltimos12Meses(territorio, hoy = new Date()) {
 // es un periodo cerrado con fecha de corte: "¿cerramos el año con todo
 // cubierto?". Por eso las dos vistas conviven en vez de sustituirse.
 
-/** Septiembre, 0-indexado: el mes en que arranca el año de servicio. */
-export const MES_INICIO_ANYO_SERVICIO = 8;
-
 export const COBERTURA_CUBIERTO = 'cubierto';
 export const COBERTURA_EN_CURSO = 'en-curso';
 export const COBERTURA_SIN_CUBRIR = 'sin-cubrir';
-
-/** Año de servicio al que pertenece una fecha: 15/09/2026 y 31/08/2027 son ambos 2026. */
-export function anyoServicioDe(date) {
-    return date.getMonth() >= MES_INICIO_ANYO_SERVICIO ? date.getFullYear() : date.getFullYear() - 1;
-}
-
-/** Límites y etiqueta de un año de servicio. `fin` es el 31 de agosto siguiente. */
-export function rangoAnyoServicio(anyo) {
-    return {
-        anyo,
-        inicio: new Date(anyo, MES_INICIO_ANYO_SERVICIO, 1),
-        // Día 0 del mes de inicio del año siguiente = su último día, sin contar agostos a mano.
-        fin: new Date(anyo + 1, MES_INICIO_ANYO_SERVICIO, 0),
-        etiqueta: `${anyo}/${String((anyo + 1) % 100).padStart(2, '0')}`,
-    };
-}
 
 /**
  * Fechas en que consta completado un territorio, de la más antigua a la más

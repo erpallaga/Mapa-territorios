@@ -121,6 +121,10 @@ test('periodos relativos se resuelven en el servidor', () => {
         ultimo_ano: ['2025-08-05', '2026-08-05'],
         este_ano: ['2026-01-01', '2026-08-05'],
         ano_pasado: ['2025-01-01', '2025-12-31'],
+        // El 5 de agosto todavía estamos en el año de servicio que empezó el
+        // septiembre ANTERIOR: 2025/26, no 2026/27.
+        anyo_servicio: ['2025-09-01', '2026-08-05'],
+        anyo_servicio_pasado: ['2024-09-01', '2025-08-31'],
     };
 
     for (const [periodo, [desde, hasta]] of Object.entries(casos)) {
@@ -130,6 +134,25 @@ test('periodos relativos se resuelven en el servidor', () => {
     }
 
     assert.equal(resolvePeriodo('la semana que viene', AHORA), null);
+});
+
+test('el año de servicio no es el año natural', () => {
+    // Es la confusión que motivó el periodo: en septiembre, "este año" (natural)
+    // cubre ocho meses del año de servicio ANTERIOR.
+    const septiembre = new Date(2026, 8, 21, 12, 0, 0);
+
+    const natural = resolvePeriodo('este_ano', septiembre);
+    assert.equal(formatISODate(natural.desde), '2026-01-01');
+
+    const servicio = resolvePeriodo('anyo_servicio', septiembre);
+    assert.equal(formatISODate(servicio.desde), '2026-09-01');
+    assert.equal(formatISODate(servicio.hasta), '2026-09-21', 'el año en curso se corta hoy');
+    assert.match(servicio.etiqueta, /2026\/27/);
+
+    // Y el 31 de agosto todavía pertenece al año de servicio que arrancó el
+    // septiembre anterior: el corte va entre el 31 de agosto y el 1 de septiembre.
+    const ultimoDia = resolvePeriodo('anyo_servicio', new Date(2026, 7, 31, 12, 0, 0));
+    assert.equal(formatISODate(ultimoDia.desde), '2025-09-01');
 });
 
 test('la semana empieza en lunes', () => {
