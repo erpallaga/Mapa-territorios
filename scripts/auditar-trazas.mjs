@@ -22,6 +22,23 @@
 // `langfuse-seed-prompt.mjs` y la edge function), o ninguna de las dos si un
 // proxy de salida ya inyecta la cabecera Authorization. Sin dependencias: el
 // fetch de Node basta.
+//
+// LANGFUSE v4: este script leía por GET /api/public/traces y
+// GET /api/public/observations, que son endpoints de v3 y Langfuse Cloud apaga
+// el 16 de noviembre de 2026. Ahora lee por GET /api/public/v2/observations, que
+// además es el único camino de lectura en tiempo real (el resto de la API
+// pública puede retrasar los datos unos diez minutos).
+//
+// El modelo de datos cambia con él: en v4 no hay un objeto "traza" aparte con su
+// propio input/output, sino una observación RAÍZ (`isRootObservation`) que los
+// lleva. Así que aquí una "traza" es su observación raíz más sus descendientes.
+//
+// El histórico NO se pierde al cambiar de endpoint: se comprobó el 2026-09-21
+// comparando las dos listas, y todas las trazas de producción que devolvía
+// GET /api/public/traces aparecen también por la v2, con su input y su output en
+// la observación raíz. Lo que sí se queda fuera es lo que se ingiera SIN la
+// cabecera `x-langfuse-ingestion-version: 4` a partir de ahora: eso no llega al
+// modelo de lectura de v4 ni pasados 25 minutos. Por eso el exportador la manda.
 
 // PRIVACIDAD: la salida lleva preguntas reales de la congregación y nombres de
 // publicadores. Este repositorio es público: no commitees nunca lo que imprime
@@ -128,38 +145,55 @@ async function api(path, params = {}) {
     return res.json();
 }
 
-/** Todas las trazas del agente desde hace `dias`, paginando hasta agotarlas. */
-async function traerTrazas() {
-    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+/**
+ * Recorre GET /api/public/v2/observations, que pagina por cursor opaco: el
+ * `meta.cursor` de una respuesta es el `cursor` de la siguiente, y no venir es
+ * la señal de que se acabó.
+ */
+async function traerObservacionesPaginando(params) {
     const todas = [];
+    let cursor;
 
-    for (let page = 1; page <= limitePaginas; page++) {
-        const r = await api('/api/public/traces', {
-            name: 'ask-territorios',
-            fromTimestamp: desde,
-            page,
-            limit: 100,
-        });
+    for (let pagina = 1; pagina <= limitePaginas; pagina++) {
+        const r = await api('/api/public/v2/observations', { ...params, limit: 100, cursor });
         const lote = r?.data ?? [];
         todas.push(...lote);
-        const totalPaginas = r?.meta?.totalPages ?? 1;
-        if (lote.length === 0 || page >= totalPaginas) break;
+        cursor = r?.meta?.cursor;
+        if (lote.length === 0 || !cursor) break;
     }
     return todas;
 }
 
-/** Observaciones de una traza. El endpoint de detalle ya las trae completas. */
+/**
+ * Las raíces de las trazas del agente desde hace `dias`. En v4 la raíz ES la
+ * traza a efectos de pregunta y respuesta: `input` y `output` son suyos.
+ */
+async function traerTrazas() {
+    const desde = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+
+    const raices = await traerObservacionesPaginando({
+        name: 'ask-territorios',
+        isRootObservation: true,
+        fromStartTime: desde,
+        fields: 'core,basic,io,metadata,trace_context',
+    });
+
+    // El resto del script habla de trazas, así que se le da la forma que espera.
+    return raices.map((o) => ({
+        id: o.traceId,
+        timestamp: o.startTime,
+        input: o.input,
+        output: o.output,
+        level: o.level,
+    }));
+}
+
+/** Las observaciones de una traza, raíz incluida. */
 async function traerObservaciones(traceId) {
-    try {
-        const t = await api(`/api/public/traces/${traceId}`);
-        if (Array.isArray(t?.observations) && typeof t.observations[0] === 'object') {
-            return t.observations;
-        }
-    } catch {
-        // cae al endpoint de observaciones
-    }
-    const r = await api('/api/public/observations', { traceId, limit: 100 });
-    return r?.data ?? [];
+    return traerObservacionesPaginando({
+        traceId,
+        fields: 'core,basic,io,metadata,model,usage',
+    });
 }
 
 function texto(v) {

@@ -10,6 +10,31 @@
 // observación propia (la API lo devuelve como "TOOL"), no se degrada a un span
 // genérico. Además `parentSpanId` produce anidamiento real de observaciones.
 // Por eso Task 4 puede usar 'tool' directamente para reconstruir las tool calls.
+//
+// LANGFUSE v4 — tres reglas que se comprobaron contra la instancia real mandando
+// la misma traza de las dos formas y leyéndola por GET /api/public/v2/observations:
+//
+//  1. Un exportador propio TIENE que mandar `x-langfuse-ingestion-version: 4`.
+//     Sin esa cabecera la petición responde 200 igual — devuelve incluso el
+//     trabajo encolado — pero la traza NO llega al modelo de lectura de v4: se
+//     probó dos veces con dos payloads distintos y seguían sin aparecer 25
+//     minutos después, mientras que la misma traza con la cabecera aparecía en
+//     segundos. El fallo es silencioso: ni error, ni traza.
+//  2. `langfuse.trace.input` / `langfuse.trace.output` están deprecados y por el
+//     camino v4 se DESCARTAN: la raíz llega con input y output a null. Esto y lo
+//     anterior van juntos a la fuerza — poner sólo la cabecera y dejar los
+//     atributos viejos es el único cambio que EMPEORA las cosas, porque hasta
+//     ahora la ingesta v3 sí rellenaba el input/output de la raíz. El
+//     input/output de conjunto va en `langfuse.observation.input` /
+//     `langfuse.observation.output` de la observación raíz, y la raíz se marca
+//     con `langfuse.internal.is_app_root`.
+//  3. Lo que identifica y agrupa (usuario, sesión, nombre, tags, entorno,
+//     metadatos de traza) va en TODAS las observaciones, no sólo en la raíz. Si
+//     `session.id` no viaja también en la generación, el coste de esa generación
+//     no cuenta para el coste de la sesión. Es lo que hace el SDK con
+//     `propagateAttributes`, y aquí lo hacen `propagatedAttrs` y `propagar()`.
+//
+// El tipo 'agent' y compañía existen en v4; aquí sólo se declaran los que se usan.
 export type ObservationType = 'span' | 'generation' | 'tool' | 'event';
 
 export type SpanAttrs = {
@@ -53,6 +78,9 @@ type PendingSpan = {
 const MAX_VALUE_CHARS = 4000;
 const FLUSH_TIMEOUT_MS = 3000;
 
+// Ver la regla 1 de la cabecera. Es obligatoria para exportadores propios.
+const INGESTION_VERSION = '4';
+
 function hex(bytes: number): string {
     const buf = new Uint8Array(bytes);
     crypto.getRandomValues(buf);
@@ -83,6 +111,14 @@ function attr(key: string, value: unknown): OtlpAttribute {
     }
     if (typeof value === 'number') return { key, value: { doubleValue: value } };
     if (typeof value === 'boolean') return { key, value: { boolValue: value } };
+    // Los tags son una lista y Langfuse los quiere como arrayValue de OTLP: si se
+    // mandan como el JSON '["a","b"]' llegan como un único tag con corchetes.
+    if (Array.isArray(value)) {
+        return {
+            key,
+            value: { arrayValue: { values: value.map((v) => ({ stringValue: stringify(v) })) } },
+        };
+    }
     return { key, value: { stringValue: stringify(value) } };
 }
 
@@ -118,14 +154,26 @@ export function createTrace(opts: TraceOptions) {
     const startedAt = Date.now();
     const spans: PendingSpan[] = [];
 
-    const traceAttrs: OtlpAttribute[] = [
-        attr('langfuse.trace.name', opts.name),
+    // Dos grupos distintos, y la diferencia importa (regla 3 de la cabecera):
+    //
+    //  - `rootAttrs` describe SOLO la observación raíz: su tipo, su input/output
+    //    de conjunto, y su nivel si la petición acabó mal.
+    //  - `propagatedAttrs` identifica y agrupa, y se copia en TODAS las
+    //    observaciones al hacer flush. `session.id` en la generación es lo que
+    //    hace que su coste cuente para el coste de la sesión.
+    const rootAttrs: OtlpAttribute[] = [
         attr('langfuse.observation.type', 'span'),
+        attr('langfuse.internal.is_app_root', true),
     ];
-    if (opts.userId) traceAttrs.push(attr('langfuse.user.id', opts.userId));
-    if (opts.sessionId) traceAttrs.push(attr('langfuse.session.id', opts.sessionId));
-    if (opts.tags?.length) traceAttrs.push(attr('langfuse.trace.tags', opts.tags));
-    if (opts.environment) traceAttrs.push(attr('langfuse.environment', opts.environment));
+    const propagatedAttrs: OtlpAttribute[] = [attr('langfuse.trace.name', opts.name)];
+    // `user.id` y `session.id` son los nombres de la convención de OpenTelemetry,
+    // que es lo que emite el SDK de Langfuse v4. Los antiguos `langfuse.user.id` y
+    // `langfuse.session.id` siguen aceptándose como alias de compatibilidad, pero
+    // no son los que documenta v4.
+    if (opts.userId) propagatedAttrs.push(attr('user.id', opts.userId));
+    if (opts.sessionId) propagatedAttrs.push(attr('session.id', opts.sessionId));
+    if (opts.tags?.length) propagatedAttrs.push(attr('langfuse.trace.tags', opts.tags));
+    if (opts.environment) propagatedAttrs.push(attr('langfuse.environment', opts.environment));
 
     function startSpan(name: string, type: ObservationType, parentSpanId?: string): Span {
         const spanId = hex(8);
@@ -180,12 +228,17 @@ export function createTrace(opts: TraceOptions) {
             }
         },
 
+        // El input/output de conjunto de la petición. En v4 vive en la observación
+        // raíz, no en la traza: `langfuse.trace.input`/`output` están deprecados y
+        // se descartan en la ingesta (regla 2 de la cabecera).
         setTrace(a: { input?: unknown; output?: unknown; metadata?: Record<string, unknown> }) {
             try {
-                if (a.input !== undefined) traceAttrs.push(attr('langfuse.trace.input', a.input));
-                if (a.output !== undefined) traceAttrs.push(attr('langfuse.trace.output', a.output));
+                if (a.input !== undefined) rootAttrs.push(attr('langfuse.observation.input', a.input));
+                if (a.output !== undefined) rootAttrs.push(attr('langfuse.observation.output', a.output));
+                // Los metadatos de traza sí siguen siendo `langfuse.trace.metadata.*`,
+                // y se propagan a todas las observaciones para poder filtrar por ellos.
                 for (const [k, v] of Object.entries(a.metadata ?? {})) {
-                    traceAttrs.push(attr(`langfuse.trace.metadata.${k}`, v));
+                    propagatedAttrs.push(attr(`langfuse.trace.metadata.${k}`, v));
                 }
             } catch (err) {
                 console.warn('[langfuse] failed to set trace attributes', err);
@@ -193,8 +246,8 @@ export function createTrace(opts: TraceOptions) {
         },
 
         setError(message: string) {
-            traceAttrs.push(attr('langfuse.observation.level', 'ERROR'));
-            traceAttrs.push(attr('langfuse.observation.status_message', message));
+            rootAttrs.push(attr('langfuse.observation.level', 'ERROR'));
+            rootAttrs.push(attr('langfuse.observation.status_message', message));
         },
 
         async flush(): Promise<void> {
@@ -206,7 +259,15 @@ export function createTrace(opts: TraceOptions) {
                     name: opts.name,
                     startMs: startedAt,
                     endMs: endedAt,
-                    attributes: traceAttrs,
+                    attributes: rootAttrs,
+                };
+
+                // Se copian aquí y no al crear cada span porque `setTrace` puede
+                // añadir metadatos después de que una observación ya haya acabado.
+                // Si una observación trae su propia clave, gana la suya.
+                const propagar = (s: PendingSpan): OtlpAttribute[] => {
+                    const propias = new Set(s.attributes.map((a) => a.key));
+                    return [...s.attributes, ...propagatedAttrs.filter((a) => !propias.has(a.key))];
                 };
 
                 const body = {
@@ -222,7 +283,7 @@ export function createTrace(opts: TraceOptions) {
                                 kind: 1,
                                 startTimeUnixNano: nano(s.startMs),
                                 endTimeUnixNano: nano(s.endMs),
-                                attributes: s.attributes,
+                                attributes: propagar(s),
                             })),
                         }],
                     }],
@@ -234,6 +295,9 @@ export function createTrace(opts: TraceOptions) {
                     headers: {
                         'Content-Type': 'application/json',
                         Authorization: `Basic ${auth}`,
+                        // Sin esto la traza se ingiere por el camino v3 y no
+                        // aparece en las lecturas v4 (regla 1 de la cabecera).
+                        'x-langfuse-ingestion-version': INGESTION_VERSION,
                     },
                     body: JSON.stringify(body),
                     signal: AbortSignal.timeout(FLUSH_TIMEOUT_MS),
