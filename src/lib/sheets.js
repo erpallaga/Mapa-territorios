@@ -48,7 +48,14 @@ export function parseTerritoryCsv(csvText) {
             complete: (results) => {
                 const rows = results.data;
                 // Skip header row
-                const dataRows = rows.slice(1);
+                const dataRows = rows.slice(1)
+                    // La hoja acaba con una fila de totales ("TOTAL 42911" en la
+                    // columna de viviendas) y sin número de territorio. Sin este
+                    // filtro se cuela como un territorio más: al no poner "LIBRE"
+                    // en su celda de estado se daba por asignada, y el recuento
+                    // salía 181 en vez de 180 — que es lo que el agente venía
+                    // contestando a "¿cuántos territorios hay?".
+                    .filter(row => String(row?.[0] ?? '').trim() !== '');
 
                 const mappedData = dataRows.map(row => {
                     // Basic info

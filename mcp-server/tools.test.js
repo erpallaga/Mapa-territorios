@@ -9,6 +9,9 @@
 // colisionan al buscar por el apellido. Es el caso que en producción hizo que
 // una tool sumara los territorios de varias personas en una sola cifra.
 //
+// La última fila reproduce la de totales que cierra la hoja de verdad: sin
+// número de territorio y con un texto en la columna de viviendas.
+//
 // No se usa el SDK de MCP: `registerTerritorioTools` solo necesita un objeto con
 // `registerTool`, así que los handlers se invocan directamente. Los tests no
 // dependen del día en que se ejecuten (nada de asserts sobre "vencido" o sobre
@@ -26,6 +29,7 @@ const CSV = `Núm. de terr.,Zona,Viviendas,Estado,Última fecha,Publicador,Asign
 5,Sarrià,25,LIBRE,45810,Núria Solé,01/04/2025,45810,,,
 6,Sants,10,ASIGNADO,30/06/2026,Ana López,01/06/2026,30/06/2026,Raquel Vidal,6/25/2026,
 7,Les Corts,35,ASIGNADO,12/12/2025,Marc Vidal,07/07/2026,,,,
+,,TOTAL 1234,,"*Cuando comience una nueva página, anote en esta columna la última fecha.",,,,,,
 `;
 
 // Servidor local que hace de Sheet publicado, para no tocar la red de verdad.
@@ -330,4 +334,17 @@ test('el periodo del año de servicio se resuelve en el servidor', async () => {
     const pasado = await call('territorios_actividad', { periodo: 'anyo_servicio_pasado' });
     assert.match(pasado.datos.rangoResuelto.desde, /-09-01$/);
     assert.match(pasado.datos.rangoResuelto.hasta, /-08-31$/);
+});
+
+test('la fila de totales de la hoja no cuenta como un territorio', async () => {
+    // La hoja real acaba en una fila "TOTAL 42911" sin número de territorio.
+    // Se colaba como territorio asignado (su celda de estado está vacía y vacío
+    // no es "LIBRE"), así que el agente contestaba 181 donde hay 180.
+    const { datos } = await call('territorios_estadisticas', {});
+    assert.equal(datos.total, 7, 'solo los territorios numerados');
+    assert.equal(datos.libres + datos.asignados, 7);
+    assert.ok(!datos.porZona.some((z) => z.zona === 'Sin zona'), 'la fila de totales no debe crear una zona fantasma');
+
+    const listado = await call('territorios_listar', {});
+    assert.ok(listado.datos.territorios.every((t) => t.id && t.id.trim() !== ''), 'ningún territorio sin id');
 });
