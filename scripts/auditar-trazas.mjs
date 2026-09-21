@@ -13,14 +13,15 @@
 // síntoma y se imprime la pregunta entera: esto se lee, no se resume.
 //
 // Uso:
-//   node --env-file=.env scripts/auditar-trazas.mjs
-//   node --env-file=.env scripts/auditar-trazas.mjs --dias 90
-//   node --env-file=.env scripts/auditar-trazas.mjs --detalle   # + pregunta/respuesta completas
-//   node --env-file=.env scripts/auditar-trazas.mjs --json      # volcado crudo para analizar aparte
+//   npm run auditar-trazas
+//   npm run auditar-trazas -- --dias 90
+//   npm run auditar-trazas -- --detalle   # + pregunta/respuesta completas
+//   npm run auditar-trazas -- --json      # volcado crudo para analizar aparte
 //
-// Necesita LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY y LANGFUSE_BASE_URL, los
-// mismos que usan `langfuse-seed-prompt.mjs` y la edge function. Sin
-// dependencias: fetch de Node basta.
+// Autenticación: LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY (las mismas que usan
+// `langfuse-seed-prompt.mjs` y la edge function), o ninguna de las dos si un
+// proxy de salida ya inyecta la cabecera Authorization. Sin dependencias: el
+// fetch de Node basta.
 
 const args = process.argv.slice(2);
 const detalle = args.includes('--detalle');
@@ -37,13 +38,23 @@ const BASE_URL = (process.env.LANGFUSE_BASE_URL || 'https://cloud.langfuse.com')
 const PUBLIC_KEY = process.env.LANGFUSE_PUBLIC_KEY;
 const SECRET_KEY = process.env.LANGFUSE_SECRET_KEY;
 
-if (!PUBLIC_KEY || !SECRET_KEY) {
-    console.error('Faltan LANGFUSE_PUBLIC_KEY y/o LANGFUSE_SECRET_KEY.');
-    console.error('Ejecuta con:  node --env-file=.env scripts/auditar-trazas.mjs');
-    process.exit(1);
-}
+// Dos formas de autenticarse, y el script acepta las dos:
+//
+//  a) Las claves en el entorno (un `.env` local, o las variables del entorno
+//     cloud). El script construye la cabecera Basic él mismo.
+//  b) Sin claves: un proxy de salida inyecta la cabecera Authorization por
+//     nosotros — es el caso de una "API credential" de un entorno cloud de
+//     Claude Code, donde la secret key nunca entra en la sesión. Entonces hay
+//     que NO mandar cabecera propia, para no pisar la que inyecta el proxy.
+const AUTH = PUBLIC_KEY && SECRET_KEY
+    ? 'Basic ' + Buffer.from(`${PUBLIC_KEY}:${SECRET_KEY}`).toString('base64')
+    : null;
 
-const AUTH = 'Basic ' + Buffer.from(`${PUBLIC_KEY}:${SECRET_KEY}`).toString('base64');
+if (!AUTH) {
+    console.error('Sin LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY en el entorno:');
+    console.error('se asume que un proxy inyecta la cabecera Authorization.');
+    console.error('Si no es el caso, pon las claves en un .env y repite.\n');
+}
 
 // Las 8 tools que registra mcp-server/tools.js. Sirve para detectar las que
 // nadie llama nunca: o sobran, o su descripción no las hace encontrables.
@@ -75,7 +86,9 @@ async function api(path, params = {}) {
     for (const [k, v] of Object.entries(params)) {
         if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
     }
-    const res = await fetch(url, { headers: { Authorization: AUTH, Accept: 'application/json' } });
+    const res = await fetch(url, {
+        headers: { Accept: 'application/json', ...(AUTH ? { Authorization: AUTH } : {}) },
+    });
     if (!res.ok) {
         const cuerpo = await res.text().catch(() => '');
         throw new Error(`${res.status} ${res.statusText} en ${path}\n${cuerpo.slice(0, 500)}`);
