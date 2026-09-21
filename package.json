@@ -10,6 +10,8 @@
     "test": "node --test src/lib/dates.test.js src/lib/completion.test.js mcp-server/tools.test.js",
     "auditar-fechas": "node scripts/auditar-fechas.mjs",
     "auditar-12m": "node scripts/auditar-12m.mjs",
+    "auditar-trazas": "node --env-file-if-exists=.env scripts/auditar-trazas.mjs",
+    "seed-prompt": "node --env-file-if-exists=.env scripts/langfuse-seed-prompt.mjs",
     "preview": "vite preview",
     "import-kml": "node scripts/import-kmls.js",
     "mcp-server": "node mcp-server/index.js"

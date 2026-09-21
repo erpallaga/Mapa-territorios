@@ -15,8 +15,10 @@ import {
     normalizeText,
     parseSheetDate,
     parseSheetDateDetailed,
+    startOfDay,
 } from "../src/lib/dates.js";
 import { ultimaFinalizacion } from "../src/lib/completion.js";
+import { DIAS_VENCIMIENTO } from "../src/lib/sheets.js";
 
 /** Coincidencia parcial sin distinguir mayúsculas ni acentos ("nuria" encuentra "Núria"). */
 export function coincideTexto(valor, aguja) {
@@ -129,6 +131,39 @@ export function nombreCanonico(indice, publisher) {
  * mismo; se reexporta aquí porque es como la conocen las tools.
  */
 export { ultimaFinalizacion };
+
+/**
+ * Cuándo vence la asignación actual, como dato y no como cuenta que el modelo
+ * tenga que echar de memoria.
+ *
+ * Existía sólo el aviso de "vencido", que aparece cuando ya es tarde, así que a
+ * la pregunta "¿cuándo caduca?" el modelo respondía sumando "cuatro meses" en
+ * prosa — y cuatro meses no son 122 días salvo por casualidad: una asignación
+ * del 07/07 vence el 06/11, no el 07/11. La regla sale de `DIAS_VENCIMIENTO`,
+ * la misma constante con la que el panel decide si pintarlo de rojo.
+ *
+ * @returns {{fecha: Date|null, dias: number|null}} `dias` es lo que queda para
+ *   vencer; negativo si ya venció. Ambos `null` si el territorio está libre o
+ *   si su fecha de asignación no se puede leer.
+ */
+export function caducidad(territorio, hoy = new Date()) {
+    if (territorio?.status !== "assigned") return { fecha: null, dias: null };
+    const asignada = parseSheetDate(territorio.assignedDate);
+    if (!asignada) return { fecha: null, dias: null };
+
+    const fecha = startOfDay(asignada);
+    fecha.setDate(fecha.getDate() + DIAS_VENCIMIENTO);
+    return { fecha, dias: daysBetween(hoy, fecha) };
+}
+
+/** La caducidad ya formateada para la salida de las tools. */
+export function caducidadNormalizada(territorio, hoy = new Date()) {
+    const { fecha, dias } = caducidad(territorio, hoy);
+    return {
+        fechaCaducidad: fecha ? formatISODate(fecha) : null,
+        diasParaCaducar: dias,
+    };
+}
 
 /** Media de días entre asignación y finalización, sobre las asignaciones ya cerradas. */
 export function diasMediosRetencion(entradas) {

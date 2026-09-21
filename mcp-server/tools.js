@@ -11,6 +11,7 @@ import {
   resolveRango,
 } from "../src/lib/dates.js";
 import {
+  caducidadNormalizada,
   coincideTexto,
   diasMediosRetencion,
   errorTool,
@@ -30,7 +31,7 @@ const ANNOTATIONS = { readOnlyHint: true, destructiveHint: false, idempotentHint
 // invente. Estos cuatro campos se repiten en todas las tools con fechas.
 const CAMPOS_FECHA = {
   periodo: z.enum(PERIODOS).optional()
-    .describe("Periodo relativo resuelto por el servidor: 'hoy', 'ayer', 'esta_semana', 'semana_pasada', 'ultimos_7_dias', 'este_mes', 'mes_pasado', 'ultimos_30_dias', 'ultimos_3_meses', 'ultimos_6_meses', 'ultimo_ano', 'este_ano', 'ano_pasado'. Es la forma preferida: NO calcules tú las fechas."),
+    .describe("Periodo relativo resuelto por el servidor: 'hoy', 'ayer', 'esta_semana', 'semana_pasada', 'ultimos_7_dias', 'este_mes', 'mes_pasado', 'ultimos_30_dias', 'ultimos_3_meses', 'ultimos_6_meses', 'ultimo_ano', 'este_ano', 'ano_pasado', 'anyo_servicio', 'anyo_servicio_pasado'. OJO: el AÑO DE SERVICIO va del 1 de septiembre al 31 de agosto y NO es el año natural — para cualquier pregunta sobre el año de servicio usa 'anyo_servicio', nunca 'este_ano'. Es la forma preferida: NO calcules tú las fechas ni las teclees en desde/hasta."),
   mes: z.string().optional()
     .describe("Un mes concreto: 'YYYY-MM' (ej. '2026-06') o su nombre ('junio', 'junio 2026'). Sin año se entiende la última vez que ocurrió ese mes."),
   desde: z.string().optional()
@@ -67,7 +68,7 @@ export function registerTerritorioTools(server) {
   const ListInputSchema = z.object({
     estado: z.enum(["libre", "asignado", "todos"])
       .default("todos")
-      .describe("Filtrar por estado: 'libre', 'asignado', o 'todos'"),
+      .describe("Filtrar por estado: 'libre' (verde en el mapa), 'asignado' (rojo), o 'todos'"),
     zona: z.string()
       .optional()
       .describe("Filtrar por zona (coincidencia parcial, sin distinguir mayúsculas)"),
@@ -84,14 +85,19 @@ export function registerTerritorioTools(server) {
       description: `Lista territorios con su estado actual (libre/asignado), zona y datos de asignación.
 Solo lectura, no modifica nada.
 
+VOCABULARIO: en el mapa, "libre" se pinta de VERDE y "asignado" de ROJO. Si preguntan
+"cuántos hay en verde" están preguntando cuántos hay libres; "en rojo" = asignados.
+
 Args:
-  - estado ('libre'|'asignado'|'todos'): filtra por estado. Por defecto 'todos'.
+  - estado ('libre'|'asignado'|'todos'): filtra por estado ('libre' = los verdes del mapa,
+    'asignado' = los rojos). Por defecto 'todos'.
   - zona (string, opcional): filtra por zona, coincidencia parcial.
   - limit (number): máximo de resultados (1-100, por defecto 50).
   - offset (number): resultados a saltar para paginación (por defecto 0).
 
 Devuelve por cada territorio: id, zona, estado, número de viviendas, publicador actual,
-fecha de asignación, si está vencido (asignado hace más de 4 meses) y días de retraso.`,
+fecha de asignación, fecha de caducidad de esa asignación y días que faltan para ella
+(negativo si ya pasó), si está vencido (asignado hace más de 4 meses) y días de retraso.`,
       inputSchema: ListInputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
@@ -123,6 +129,7 @@ fecha de asignación, si está vencido (asignado hace más de 4 meses) y días d
         // realmente sigue asignado.
         publicador: t.status === "assigned" ? nombreCanonico(indice, t.publisher) : null,
         fechaAsignacion: t.status === "assigned" ? fechaNormalizada(t.assignedDate).iso : null,
+        ...caducidadNormalizada(t),
         vencido: t.isExpired,
         diasVencido: t.isExpired ? t.expiredDays : null
       }));
@@ -160,9 +167,13 @@ Solo lectura.
 Args:
   - id (string): número de territorio, ej. "45".
 
-Devuelve: zona, estado, número de viviendas, publicador actual, fecha de asignación, si está vencido,
-última fecha de finalización, finalizaciones en los últimos 12 meses, e historial completo de
-asignaciones (del más reciente al más antiguo).
+Devuelve: zona, estado, número de viviendas, publicador actual, fecha de asignación,
+fechaCaducidad y diasParaCaducar (cuándo vence esa asignación; negativo si ya venció),
+si está vencido, última fecha de finalización, finalizaciones en los últimos 12 meses,
+e historial completo de asignaciones (del más reciente al más antiguo).
+
+NO calcules tú la caducidad sumando "cuatro meses": la regla real son 122 días y el
+resultado se desvía. Usa 'fechaCaducidad' tal cual.
 
 Si el ID no existe, devuelve un mensaje de error indicándolo.`,
       inputSchema: GetByIdInputSchema,
@@ -190,6 +201,7 @@ Si el ID no existe, devuelve un mensaje de error indicándolo.`,
         // ya liberado.
         publicador: t.status === "assigned" ? nombreCanonico(indice, t.publisher) : null,
         fechaAsignacion: t.status === "assigned" ? fechaNormalizada(t.assignedDate).iso : null,
+        ...caducidadNormalizada(t),
         ultimaFechaCompletado: fechaNormalizada(t.lastCompletedDate).iso,
         finalizacionesUltimos12Meses: t.completionCount12m,
         vencido: t.isExpired,
@@ -203,7 +215,12 @@ Si el ID no existe, devuelve un mensaje de error indicándolo.`,
 
       const lines = [`# Territorio ${t.id} (${t.zone || "sin zona"})`, "", `**Estado:** ${output.estado}`];
       if (output.publicador) lines.push(`**Publicador actual:** ${output.publicador} (asignado ${fechaNormalizada(t.assignedDate).texto})`);
-      if (output.vencido) lines.push(`⚠️ **Vencido** hace ${output.diasVencido} días`);
+      // La fecha de caducidad se da hecha: si el modelo la calcula sumando
+      // "cuatro meses" se desvía un día respecto a lo que muestra el panel.
+      if (output.fechaCaducidad && !output.vencido) {
+        lines.push(`**Caduca el** ${formatSheetDate(parseSheetDate(output.fechaCaducidad))} (${plural(output.diasParaCaducar, "día", "días")})`);
+      }
+      if (output.vencido) lines.push(`⚠️ **Vencido** hace ${output.diasVencido} días (caducó el ${formatSheetDate(parseSheetDate(output.fechaCaducidad))})`);
       lines.push("", "## Historial", "");
       if (t.history.length === 0) {
         lines.push("Sin historial registrado.");
@@ -237,7 +254,8 @@ Args:
   - limit (number): máximo de resultados (1-100, por defecto 50).
   - offset (number): resultados a saltar para paginación.
 
-Devuelve por cada territorio: id, zona, publicador, fecha de asignación y días de retraso.`,
+Devuelve por cada territorio: id, zona, publicador, fecha de asignación, la fecha en que
+caducó y los días de retraso desde entonces.`,
       inputSchema: ExpiredInputSchema,
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
     },
@@ -256,7 +274,9 @@ Devuelve por cada territorio: id, zona, publicador, fecha de asignación y días
       const page = expired.slice(offset, offset + limit);
       const items = page.map((t) => ({
         id: t.id, zona: t.zone, publicador: nombreCanonico(indice, t.publisher),
-        fechaAsignacion: fechaNormalizada(t.assignedDate).iso, diasVencido: t.expiredDays
+        fechaAsignacion: fechaNormalizada(t.assignedDate).iso,
+        ...caducidadNormalizada(t),
+        diasVencido: t.expiredDays
       }));
 
       const output = {
@@ -346,8 +366,14 @@ Args:
 
 Devuelve un bloque "resumen" (territorios actuales, vencidos, asignaciones y finalizaciones del
 periodo, días medios que retiene un territorio, última actividad) y la lista de coincidencias.
-Si el nombre coincide con varias personas, "resumen.nombresCoincidentes" las lista: úsalo para
-repreguntar o para afinar la búsqueda. Los ids devueltos sirven para territorios_buscar_por_id.`,
+
+IMPORTANTE, nombres ambiguos: el nombre se busca por coincidencia parcial, así que un apellido
+puede casar con varias personas. Cuando pasa, "resumen.ambiguo" es true, TODAS las cifras
+conjuntas del resumen valen null y los datos van desglosados en "resumen.porPublicador", una
+entrada por persona. En ese caso NO sumes las cifras de varias personas ni atribuyas a una los
+territorios de otra: di que el nombre es ambiguo, nombra a los candidatos de
+"resumen.nombresCoincidentes" y pide el nombre completo, o responde por cada uno por separado.
+Los ids devueltos sirven para territorios_buscar_por_id.`,
       inputSchema: PublisherInputSchema,
       annotations: ANNOTATIONS
     },
@@ -400,6 +426,7 @@ repreguntar o para afinar la búsqueda. Los ids devueltos sirven para territorio
             publicador: nombreCanonico(indice, t.publisher),
             fechaAsignacion: fechaNormalizada(t.assignedDate).iso,
             diasAsignado: parseSheetDate(t.assignedDate) ? daysBetween(parseSheetDate(t.assignedDate), new Date()) : null,
+            ...caducidadNormalizada(t),
             vencido: t.isExpired,
             diasVencido: t.isExpired ? t.expiredDays : null
           }));
@@ -421,61 +448,137 @@ repreguntar o para afinar la búsqueda. Los ids devueltos sirven para territorio
         });
       }
 
-      const asignacionesEnRango = enRango.filter(({ h }) =>
-        isWithinRange(parseSheetDate(h.assignedDate), rango.desde, rango.hasta)).length;
-      const finalizacionesEnRango = enRango.filter(({ h }) =>
-        isWithinRange(parseSheetDate(h.completedDate), rango.desde, rango.hasta)).length;
+      // Las cifras de un subconjunto de territorios/entradas. Se calcula igual
+      // para el total y para cada persona, que es lo que permite no mezclarlas.
+      const cifras = (susActuales, susEntradas) => {
+        const suRango = susEntradas.filter(({ h }) => {
+          if (!hayRango) return true;
+          const a = parseSheetDate(h.assignedDate);
+          const c = parseSheetDate(h.completedDate);
+          return isWithinRange(a, rango.desde, rango.hasta) || isWithinRange(c, rango.desde, rango.hasta);
+        });
 
-      let ultimaActividad = null;
-      for (const { h } of entradasHistorial) {
-        for (const raw of [h.assignedDate, h.completedDate]) {
-          const d = parseSheetDate(raw);
-          if (d && (!ultimaActividad || d > ultimaActividad)) ultimaActividad = d;
+        let ultima = null;
+        for (const { h } of susEntradas) {
+          for (const raw of [h.assignedDate, h.completedDate]) {
+            const d = parseSheetDate(raw);
+            if (d && (!ultima || d > ultima)) ultima = d;
+          }
         }
-      }
+
+        return {
+          territoriosActuales: susActuales.length,
+          idsActuales: susActuales.map((t) => t.id),
+          vencidosActuales: susActuales.filter((t) => t.isExpired).length,
+          asignacionesEnRango: suRango.filter(({ h }) =>
+            isWithinRange(parseSheetDate(h.assignedDate), rango.desde, rango.hasta)).length,
+          finalizacionesEnRango: suRango.filter(({ h }) =>
+            isWithinRange(parseSheetDate(h.completedDate), rango.desde, rango.hasta)).length,
+          diasMediosRetencion: diasMediosRetencion(suRango.map(({ h }) => h)),
+          ultimaActividad: ultima ? formatISODate(ultima) : null
+        };
+      };
 
       const { page, meta } = paginar(coincidencias, offset, limit);
+
+      // Coincidir por subcadena es deliberado: así "nuria" encuentra "Núria" y
+      // un apellido suelto encuentra a quien lo lleva. El problema no era ese,
+      // era sumar en un mismo resumen a varias personas distintas: "4
+      // territorios asignados" cuando en realidad eran 1 de una y 3 de otras
+      // dos. Había un ⚠️ avisando y no bastó — un aviso al lado de una cifra
+      // pierde contra la cifra. Así que con más de un nombre las cifras
+      // conjuntas no se calculan: sólo existe el desglose por persona, y el
+      // modelo no puede citar un total que no le damos.
+      const ambiguo = nombresCoincidentes.length > 1;
+
+      const porPublicador = !ambiguo ? undefined : nombresCoincidentes.map((nombre) => {
+        const clave = normalizeText(nombre);
+        return {
+          publicador: nombre,
+          ...cifras(
+            actuales.filter((t) => normalizeText(t.publisher) === clave),
+            entradasHistorial.filter(({ h }) => normalizeText(h.publisher) === clave),
+          )
+        };
+      });
+
+      const conjuntas = ambiguo ? null : cifras(actuales, entradasHistorial);
 
       const resumen = {
         consulta: publicador,
         nombresCoincidentes,
-        territoriosActuales: actuales.length,
-        vencidosActuales: actuales.filter((t) => t.isExpired).length,
-        asignacionesEnRango,
-        finalizacionesEnRango,
-        diasMediosRetencion: diasMediosRetencion(enRango.map(({ h }) => h)),
-        ultimaActividad: ultimaActividad ? formatISODate(ultimaActividad) : null
+        ambiguo,
+        // En ambiguo van todas a null a propósito: el dato correcto está en
+        // porPublicador y cualquier agregado aquí sería de personas mezcladas.
+        territoriosActuales: conjuntas?.territoriosActuales ?? null,
+        vencidosActuales: conjuntas?.vencidosActuales ?? null,
+        asignacionesEnRango: conjuntas?.asignacionesEnRango ?? null,
+        finalizacionesEnRango: conjuntas?.finalizacionesEnRango ?? null,
+        diasMediosRetencion: conjuntas ? conjuntas.diasMediosRetencion : null,
+        ultimaActividad: conjuntas?.ultimaActividad ?? null,
+        ...(porPublicador ? { porPublicador } : {})
       };
+
+      // `meta.total` cuenta las filas de TODOS los coincidentes, así que con
+      // varios homónimos vuelve a ser el número fusionado — el mismo "4" del
+      // incidente, colado esta vez por el bloque de paginación. Se renombra:
+      // la paginación sigue funcionando, pero ya no hay ningún campo que se
+      // pueda leer como "los territorios de esta persona".
+      const { total, ...paginacion } = meta;
+      const metaSalida = ambiguo
+        ? { ...paginacion, filasDeVariosPublicadores: total }
+        : meta;
 
       const output = {
         ...describirRango(rango),
         resumen,
-        ...meta,
+        ...metaSalida,
         coincidencias: page
       };
 
       // Si el nombre parcial resuelve a una sola persona, la citamos por su
       // nombre canónico: es lo que el agente debe repetir en la respuesta.
-      const titulo = nombresCoincidentes.length === 1 ? nombresCoincidentes[0] : publicador;
+      const titulo = ambiguo ? publicador : (nombresCoincidentes[0] ?? publicador);
       const lines = [`# ${titulo} — ${rango.etiqueta}`, ""];
-      if (nombresCoincidentes.length > 1) {
-        lines.push(`⚠️ El nombre coincide con ${nombresCoincidentes.length} publicadores: ${nombresCoincidentes.join(", ")}.`, "");
+
+      if (ambiguo) {
+        // El texto tampoco enseña un total: si lo enseñara, el modelo lo citaría.
+        lines.push(
+          `⚠️ "${publicador}" no identifica a una sola persona: coincide con ${nombresCoincidentes.length} publicadores.`,
+          `**No se dan cifras conjuntas porque serían de personas distintas sumadas.** Aquí está cada uno por separado; si la pregunta era por uno solo, vuelve a preguntar con su nombre completo.`,
+          ""
+        );
+        for (const p of porPublicador) {
+          const actualesTxt = p.territoriosActuales > 0
+            ? `${plural(p.territoriosActuales, "territorio", "territorios")} [${p.idsActuales.join(", ")}]${p.vencidosActuales > 0 ? ` ⚠️ ${plural(p.vencidosActuales, "vencido", "vencidos")}` : ""}`
+            : "sin territorios asignados ahora";
+          lines.push(
+            `- **${p.publicador}**: ${actualesTxt} · ${plural(p.asignacionesEnRango, "asignación", "asignaciones")}, ${plural(p.finalizacionesEnRango, "finalización", "finalizaciones")} en el periodo${p.ultimaActividad ? ` · última actividad ${p.ultimaActividad}` : ""}`
+          );
+        }
+      } else {
+        lines.push(
+          `- **Territorios asignados ahora:** ${resumen.territoriosActuales}${resumen.vencidosActuales > 0 ? ` (${plural(resumen.vencidosActuales, "vencido", "vencidos")})` : ""}`,
+          `- **En el periodo:** ${plural(resumen.asignacionesEnRango, "asignación", "asignaciones")}, ${plural(resumen.finalizacionesEnRango, "finalización", "finalizaciones")}`,
+          ...(resumen.diasMediosRetencion !== null ? [`- **Días medios con un territorio:** ${resumen.diasMediosRetencion}`] : []),
+          ...(resumen.ultimaActividad ? [`- **Última actividad:** ${resumen.ultimaActividad}`] : []),
+        );
       }
-      lines.push(
-        `- **Territorios asignados ahora:** ${resumen.territoriosActuales}${resumen.vencidosActuales > 0 ? ` (${plural(resumen.vencidosActuales, "vencido", "vencidos")})` : ""}`,
-        `- **En el periodo:** ${plural(resumen.asignacionesEnRango, "asignación", "asignaciones")}, ${plural(resumen.finalizacionesEnRango, "finalización", "finalizaciones")}`,
-        ...(resumen.diasMediosRetencion !== null ? [`- **Días medios con un territorio:** ${resumen.diasMediosRetencion}`] : []),
-        ...(resumen.ultimaActividad ? [`- **Última actividad:** ${resumen.ultimaActividad}`] : []),
-        "",
-        `## Territorios (${meta.total}, mostrando ${meta.count})`,
-        ""
-      );
+
+      // En ambiguo el encabezado tampoco lleva un total suelto: es el reparto
+      // por persona de arriba el que responde "cuántos tiene", no esta lista.
+      lines.push("", ambiguo
+        ? `## Territorios de los ${nombresCoincidentes.length} publicadores, uno por línea`
+        : `## Territorios (${meta.total}, mostrando ${meta.count})`, "");
       for (const m of page) {
         const marca = m.tipo === "historico" ? " (histórico)" : m.vencido ? ` ⚠️ vencido (${plural(m.diasVencido, "día", "días")})` : "";
         const fechas = m.fechaCompletado
           ? `asignado ${m.fechaAsignacion}, completado ${m.fechaCompletado}`
           : `asignado ${m.fechaAsignacion || "sin fecha"}`;
-        lines.push(`- **Territorio ${m.id}** (${m.zona || "sin zona"}): ${fechas}${marca}`);
+        // Con varios homónimos, cada territorio dice de quién es: si no, la
+        // lista se lee como si fueran todos de la persona del título.
+        const dueño = ambiguo ? `${m.publicador} — ` : "";
+        lines.push(`- **Territorio ${m.id}** (${m.zona || "sin zona"}): ${dueño}${fechas}${marca}`);
       }
       if (page.length === 0) {
         lines.push(nombresCoincidentes.length === 0

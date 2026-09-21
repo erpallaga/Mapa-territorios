@@ -3,6 +3,14 @@ import { parseSheetDate } from './dates.js';
 import { finalizacionesUltimos12Meses, ultimaFinalizacion } from './completion.js';
 
 /**
+ * Una asignación "vence" a los 4 meses de entregarse. 122 días: es la cifra
+ * exacta que pintan el mapa y el panel, así que cualquiera que necesite decir
+ * *cuándo* vence un territorio tiene que salir de aquí y no de "cuatro meses"
+ * contados a ojo, que se desvía un día según el mes.
+ */
+export const DIAS_VENCIMIENTO = Math.round(4 * 30.44); // 122
+
+/**
  * Fetches territory data from a Google Sheet published as CSV.
  * @param {string} sheetUrl - The URL of the published CSV.
  * @returns {Promise<Array>} - Array of territory objects.
@@ -40,7 +48,14 @@ export function parseTerritoryCsv(csvText) {
             complete: (results) => {
                 const rows = results.data;
                 // Skip header row
-                const dataRows = rows.slice(1);
+                const dataRows = rows.slice(1)
+                    // La hoja acaba con una fila de totales ("TOTAL 42911" en la
+                    // columna de viviendas) y sin número de territorio. Sin este
+                    // filtro se cuela como un territorio más: al no poner "LIBRE"
+                    // en su celda de estado se daba por asignada, y el recuento
+                    // salía 181 en vez de 180 — que es lo que el agente venía
+                    // contestando a "¿cuántos territorios hay?".
+                    .filter(row => String(row?.[0] ?? '').trim() !== '');
 
                 const mappedData = dataRows.map(row => {
                     // Basic info
@@ -102,10 +117,9 @@ export function parseTerritoryCsv(csvText) {
                             const now = new Date();
                             const diffMs = now - assignedDateObj;
                             const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                            const fourMonthsInDays = Math.round(4 * 30.44); // ~122 days
-                            if (diffDaysTotal >= fourMonthsInDays) {
+                            if (diffDaysTotal >= DIAS_VENCIMIENTO) {
                                 isExpired = true;
-                                expiredDays = diffDaysTotal - fourMonthsInDays; // Days PAST the 4-month mark
+                                expiredDays = diffDaysTotal - DIAS_VENCIMIENTO; // Days PAST the 4-month mark
                             }
                         }
                     }
