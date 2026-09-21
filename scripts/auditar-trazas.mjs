@@ -23,6 +23,23 @@
 // proxy de salida ya inyecta la cabecera Authorization. Sin dependencias: el
 // fetch de Node basta.
 
+// PRIVACIDAD: la salida lleva preguntas reales de la congregación y nombres de
+// publicadores. Este repositorio es público: no commitees nunca lo que imprime
+// este script, ni entero ni a trozos. El script sí, su salida no.
+//
+// Node >= 22.21 ignora HTTPS_PROXY en su `fetch` salvo que NODE_USE_ENV_PROXY=1
+// esté puesto ANTES de arrancar, así que no vale con asignarlo aquí: hay que
+// relanzarse. Sin esto, en un entorno con proxy de salida todas las llamadas
+// mueren con un 403 del proxy en vez de llegar a Langfuse.
+if (!process.env.NODE_USE_ENV_PROXY && (process.env.HTTPS_PROXY || process.env.https_proxy)) {
+    const { spawnSync } = await import('node:child_process');
+    const r = spawnSync(process.execPath, process.argv.slice(1), {
+        stdio: 'inherit',
+        env: { ...process.env, NODE_USE_ENV_PROXY: '1' },
+    });
+    process.exit(r.status ?? 1);
+}
+
 const args = process.argv.slice(2);
 const detalle = args.includes('--detalle');
 const comoJson = args.includes('--json');
@@ -77,9 +94,16 @@ const PERIODOS_ANYO_NATURAL = new Set(['este_ano', 'ano_pasado', 'ultimo_ano']);
 const RE_ANYO_SERVICIO = /a[ñn]o\s+de\s+servicio|a[ñn]o\s+servicio|campa[ñn]a|curso\s+\d{2}\s*[/-]\s*\d{2}/i;
 const RE_ESTE_ANYO = /\beste\s+a[ñn]o\b|\bel\s+a[ñn]o\s+pasado\b|\ben\s+lo\s+que\s+va\s+de\s+a[ñn]o\b/i;
 
-// Fórmulas con las que el modelo se escurre. No prueban que falte una tool,
-// pero son el sitio donde mirar primero.
-const RE_EVASIVA = /no\s+(puedo|tengo|dispongo|consta|encuentro|hay)\b|no\s+se\s+puede|no\s+est[áa]\s+disponible|lo\s+siento|no\s+dispongo\s+de|no\s+tengo\s+(acceso|forma|manera)/i;
+// Fórmulas con las que el modelo se escurre. Solo incapacidad del agente: "no
+// tengo acceso", "no puedo". Ojo con confundirlas con un dato legítimamente
+// vacío ("no hay ningún publicador con ese nombre", "no tiene territorios"),
+// que es una respuesta correcta, no una evasiva; por eso no se buscan aquí.
+const RE_EVASIVA = /no\s+(puedo|s[ée])\b|no\s+se\s+puede|no\s+est[áa]\s+disponible|no\s+dispongo\s+de|no\s+tengo\s+(acceso|forma|manera|informaci[óo]n|datos)|fuera\s+de\s+mi\s+alcance/i;
+
+// Preguntas que ninguna tool puede contestar hoy: el MCP solo ve la hoja, nunca
+// la geometría de los KML, y no agrega `numViviendas`.
+const RE_GEOMETRIA = /\bcalles?\b|\bcerca\b|\bcercanos?\b|colind|\blimita\b|\balrededor\b|\bvecinos?\b|\bmapa\b|\bverde\b|\brojo\b|\bcolor(es)?\b|\bdibuj/i;
+const RE_VIVIENDAS = /vivienda|\bpisos?\b|\bpuertas\b|\bcasas\b/i;
 
 async function api(path, params = {}) {
     const url = new URL(`${BASE_URL}${path}`);
@@ -143,31 +167,59 @@ function comoObjeto(v) {
     return null;
 }
 
+/**
+ * Un año de servicio va del 1 de septiembre al 31 de agosto. Si alguien teclea
+ * ese rango a mano en `desde`/`hasta` es que quería un periodo que no existe en
+ * `PERIODOS`: la prueba de que la ventana hace falta, aunque la respuesta salga
+ * bien porque el usuario hizo el trabajo del agente.
+ */
+function esRangoAnyoServicio(args) {
+    const d = String(args?.desde ?? '');
+    const h = String(args?.hasta ?? '');
+    return /^\d{4}-09-01$/.test(d) && /^\d{4}-08-31$/.test(h);
+}
+
 /** Clasifica una traza en sus síntomas. Una traza puede tener varios. */
 function analizar(traza, observaciones) {
-    const generacion = observaciones.find((o) => o.name === 'anthropic-messages');
-    const tools = observaciones.filter(
+    // Langfuse devuelve las observaciones sin ordenar: hay que ordenarlas por
+    // startTime o la secuencia de tools que se imprime no es la que ocurrió.
+    const obs = [...observaciones].sort(
+        (a, b) => new Date(a.startTime) - new Date(b.startTime),
+    );
+
+    // Puede haber más de una generación por traza (varias vueltas del bucle de
+    // tools), así que no vale con quedarse con la primera: para stop_reason
+    // manda la última, y para "¿se truncó alguna?" mandan todas.
+    const generaciones = obs.filter(
+        (o) => String(o.type || '').toUpperCase() === 'GENERATION' || o.name === 'anthropic-messages',
+    );
+    const ultima = generaciones[generaciones.length - 1];
+    const tools = obs.filter(
         (o) => String(o.type || '').toUpperCase() === 'TOOL' || TOOLS_MCP.includes(o.name),
     );
 
-    const meta = generacion?.metadata ?? {};
-    const stopReason = String(meta.stop_reason ?? '');
+    const stopReason = String(ultima?.metadata?.stop_reason ?? '');
     const pregunta = texto(traza.input);
     const respuesta = texto(traza.output);
 
     const llamadas = tools.map((o) => ({
         nombre: o.metadata?.tool_name || o.name,
         args: comoObjeto(o.input) ?? {},
+        // El resultado llega como bloques de contenido de Anthropic
+        // ([{type:'text',text:...}]), no como string suelto.
+        salida: Array.isArray(comoObjeto(o.output))
+            ? comoObjeto(o.output).map((b) => b?.text ?? '').join('\n')
+            : texto(o.output),
         error: o.metadata?.is_error === true || o.metadata?.is_error === 'true',
     }));
 
     const sintomas = [];
 
     if (stopReason === 'refusal' || respuesta === '[refusal]') sintomas.push('NEGATIVA');
-    if (String(traza.level || '').toUpperCase() === 'ERROR' || generacion?.level === 'ERROR') {
+    if (String(traza.level || '').toUpperCase() === 'ERROR' || generaciones.some((g) => g.level === 'ERROR')) {
         sintomas.push('ERROR');
     }
-    if (stopReason === 'max_tokens') sintomas.push('TRUNCADA');
+    if (generaciones.some((g) => g.metadata?.stop_reason === 'max_tokens')) sintomas.push('TRUNCADA');
     if (llamadas.some((l) => l.error)) sintomas.push('TOOL_ERROR');
     if (llamadas.length === 0 && pregunta) sintomas.push('SIN_TOOLS');
 
@@ -175,11 +227,27 @@ function analizar(traza, observaciones) {
     const preguntaAnyoServicio = RE_ANYO_SERVICIO.test(pregunta) || RE_ESTE_ANYO.test(pregunta);
     const usoAnyoNatural = llamadas.some((l) => PERIODOS_ANYO_NATURAL.has(String(l.args?.periodo)));
     if (preguntaAnyoServicio && usoAnyoNatural) sintomas.push('VENTANA_EQUIVOCADA');
-    // Preguntó por el año de servicio y ni siquiera acotó fechas.
     if (preguntaAnyoServicio && llamadas.length > 0 && !llamadas.some((l) => l.args?.periodo || l.args?.mes || l.args?.desde)) {
         sintomas.push('ANYO_SERVICIO_SIN_RANGO');
     }
+    // La misma carencia, vista por el otro lado: el usuario tecleó el 1-sep/31-ago
+    // a mano porque no hay `periodo: 'anyo_servicio'` que pedir.
+    if (llamadas.some((l) => esRangoAnyoServicio(l.args))) sintomas.push('ANYO_SERVICIO_A_MANO');
 
+    // `territorios_buscar_por_publicador` casa por subcadena ("Mora" encuentra
+    // "Rocamora") y, cuando casa con varias personas, SUMA sus cifras en un solo
+    // resumen. Avisa en `nombresCoincidentes`, pero los totales que devuelve ya
+    // vienen mezclados, así que el modelo los atribuye a una sola persona.
+    for (const l of llamadas) {
+        const m = /El nombre coincide con (\d+) publicadores?: ([^\n]+)/.exec(l.salida || '');
+        if (m && Number(m[1]) > 1) {
+            sintomas.push('AMBIGUEDAD_AGREGADA');
+            l.personasMezcladas = m[2].trim();
+        }
+    }
+
+    if (RE_GEOMETRIA.test(pregunta)) sintomas.push('PREGUNTA_GEOMETRIA');
+    if (RE_VIVIENDAS.test(pregunta)) sintomas.push('PREGUNTA_VIVIENDAS');
     if (llamadas.length > 0 && RE_EVASIVA.test(respuesta)) sintomas.push('EVASIVA_CON_TOOLS');
 
     return {
@@ -189,7 +257,7 @@ function analizar(traza, observaciones) {
         respuesta,
         stopReason,
         llamadas,
-        sintomas,
+        sintomas: [...new Set(sintomas)],
     };
 }
 
@@ -241,6 +309,10 @@ async function main() {
     const orden = [
         ['VENTANA_EQUIVOCADA', 'Preguntó por el año de servicio, se miró el año natural (respuesta plausible y falsa)'],
         ['ANYO_SERVICIO_SIN_RANGO', 'Preguntó por el año de servicio y no se acotaron fechas'],
+        ['ANYO_SERVICIO_A_MANO', 'Tecleó el 1-sep/31-ago a mano: el periodo que falta en PERIODOS'],
+        ['AMBIGUEDAD_AGREGADA', 'El nombre casó con varias personas y la tool sumó sus cifras en una'],
+        ['PREGUNTA_GEOMETRIA', 'Preguntó por mapa/calles/colores: ninguna tool ve la geometría'],
+        ['PREGUNTA_VIVIENDAS', 'Preguntó por viviendas: ninguna tool las agrega'],
         ['NEGATIVA', 'El modelo se negó a responder (stop_reason: refusal)'],
         ['ERROR', 'La traza acabó en error'],
         ['TOOL_ERROR', 'Alguna tool devolvió isError'],
@@ -264,6 +336,9 @@ async function main() {
             console.log(`- ${encabezado(c)}`);
             if (c.llamadas.length > 0) {
                 console.log(`    tools: ${c.llamadas.map((l) => `${l.nombre}(${JSON.stringify(l.args)})`).join(' · ')}`);
+            }
+            for (const l of c.llamadas) {
+                if (l.personasMezcladas) console.log(`    ⚠️ cifras sumadas de: ${l.personasMezcladas}`);
             }
             if (detalle) {
                 console.log(`    P: ${c.pregunta}`);
