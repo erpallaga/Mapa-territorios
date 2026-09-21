@@ -9,8 +9,8 @@
     "eval": "node --env-file=../../.env run-experiment.mjs"
   },
   "dependencies": {
-    "@langfuse/client": "^5.6.0",
-    "@langfuse/otel": "^5.6.0",
-    "@opentelemetry/sdk-node": "^0.57.0"
+    "@langfuse/client": "^5.11.1",
+    "@langfuse/otel": "^5.11.1",
+    "@opentelemetry/sdk-node": "^0.222.0"
   }
 }
