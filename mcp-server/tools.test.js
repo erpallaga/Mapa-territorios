@@ -266,6 +266,12 @@ test('publicador ambiguo: no se suman las cifras de personas distintas', async (
     assert.match(texto, /no identifica a una sola persona/);
     assert.match(texto, /No se dan cifras conjuntas/);
     assert.doesNotMatch(texto, /Territorios asignados ahora:/);
+
+    // Ni por la puerta de atrás: `meta.total` cuenta las filas de todos los
+    // coincidentes, así que en ambiguo sería otra vez el número fusionado.
+    assert.equal(datos.total, undefined, 'la paginación no debe exponer un total conjunto');
+    assert.equal(datos.filasDeVariosPublicadores, 2, 'el conteo conjunto va renombrado, no borrado');
+    assert.doesNotMatch(texto, /## Territorios \(\d/, 'el encabezado no lleva un total suelto');
 });
 
 test('publicador ambiguo: cada territorio dice de quién es', async () => {
@@ -283,11 +289,15 @@ test('publicador ambiguo: cada territorio dice de quién es', async () => {
 });
 
 test('publicador no ambiguo: sigue dando las cifras conjuntas', async () => {
-    const { datos } = await call('territorios_buscar_por_publicador', { publicador: 'raquel' });
+    const { datos, texto } = await call('territorios_buscar_por_publicador', { publicador: 'raquel' });
 
     assert.equal(datos.resumen.ambiguo, false);
     assert.equal(datos.resumen.porPublicador, undefined);
     assert.equal(datos.resumen.territoriosActuales, 1);
+    // Con una sola persona el total sí es suyo: se mantiene donde estaba.
+    assert.equal(datos.total, 1);
+    assert.equal(datos.filasDeVariosPublicadores, undefined);
+    assert.match(texto, /## Territorios \(1, mostrando 1\)/);
 });
 
 // ─── Caducidad ──────────────────────────────────────────────────────────────

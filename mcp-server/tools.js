@@ -519,10 +519,20 @@ Los ids devueltos sirven para territorios_buscar_por_id.`,
         ...(porPublicador ? { porPublicador } : {})
       };
 
+      // `meta.total` cuenta las filas de TODOS los coincidentes, así que con
+      // varios homónimos vuelve a ser el número fusionado — el mismo "4" del
+      // incidente, colado esta vez por el bloque de paginación. Se renombra:
+      // la paginación sigue funcionando, pero ya no hay ningún campo que se
+      // pueda leer como "los territorios de esta persona".
+      const { total, ...paginacion } = meta;
+      const metaSalida = ambiguo
+        ? { ...paginacion, filasDeVariosPublicadores: total }
+        : meta;
+
       const output = {
         ...describirRango(rango),
         resumen,
-        ...meta,
+        ...metaSalida,
         coincidencias: page
       };
 
@@ -555,7 +565,11 @@ Los ids devueltos sirven para territorios_buscar_por_id.`,
         );
       }
 
-      lines.push("", `## Territorios (${meta.total}, mostrando ${meta.count})`, "");
+      // En ambiguo el encabezado tampoco lleva un total suelto: es el reparto
+      // por persona de arriba el que responde "cuántos tiene", no esta lista.
+      lines.push("", ambiguo
+        ? `## Territorios de los ${nombresCoincidentes.length} publicadores, uno por línea`
+        : `## Territorios (${meta.total}, mostrando ${meta.count})`, "");
       for (const m of page) {
         const marca = m.tipo === "historico" ? " (histórico)" : m.vencido ? ` ⚠️ vencido (${plural(m.diasVencido, "día", "días")})` : "";
         const fechas = m.fechaCompletado

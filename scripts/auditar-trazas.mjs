@@ -102,7 +102,15 @@ const RE_EVASIVA = /no\s+(puedo|s[ée])\b|no\s+se\s+puede|no\s+est[áa]\s+dispon
 
 // Preguntas que ninguna tool puede contestar hoy: el MCP solo ve la hoja, nunca
 // la geometría de los KML, y no agrega `numViviendas`.
-const RE_GEOMETRIA = /\bcalles?\b|\bcerca\b|\bcercanos?\b|colind|\blimita\b|\balrededor\b|\bvecinos?\b|\bmapa\b|\bverde\b|\brojo\b|\bcolor(es)?\b|\bdibuj/i;
+//
+// OJO con los colores: "cuántos hay en verde" NO es geometría. Las tools ya
+// traducen verde=libre y rojo=asignado, así que una pregunta por el color se
+// contesta perfectamente. Estaban aquí dentro y marcaban como irrespondible
+// justo lo que se acababa de hacer respondible — es decir, corrompían la
+// auditoría siguiente. Viven ahora en RE_COLOR, que solo salta si además NO se
+// llamó a ninguna tool, que es el único caso en que el color fue un problema.
+const RE_GEOMETRIA = /\bcalles?\b|\bcerca\b|\bcercanos?\b|colind|\blimita\b|\balrededor\b|\bvecinos?\b|\bdibuj/i;
+const RE_COLOR = /\bverde[s]?\b|\brojo[s]?\b|\bcolor(es)?\b/i;
 const RE_VIVIENDAS = /vivienda|\bpisos?\b|\bpuertas\b|\bcasas\b/i;
 
 async function api(path, params = {}) {
@@ -247,6 +255,9 @@ function analizar(traza, observaciones) {
     }
 
     if (RE_GEOMETRIA.test(pregunta)) sintomas.push('PREGUNTA_GEOMETRIA');
+    // Solo cuenta como problema de vocabulario si el color dejó al modelo sin
+    // saber qué tool usar; si llamó a una, la pregunta se resolvió.
+    if (RE_COLOR.test(pregunta) && llamadas.length === 0) sintomas.push('VOCABULARIO_COLOR');
     if (RE_VIVIENDAS.test(pregunta)) sintomas.push('PREGUNTA_VIVIENDAS');
     if (llamadas.length > 0 && RE_EVASIVA.test(respuesta)) sintomas.push('EVASIVA_CON_TOOLS');
 
@@ -311,7 +322,8 @@ async function main() {
         ['ANYO_SERVICIO_SIN_RANGO', 'Preguntó por el año de servicio y no se acotaron fechas'],
         ['ANYO_SERVICIO_A_MANO', 'Tecleó el 1-sep/31-ago a mano: el periodo que falta en PERIODOS'],
         ['AMBIGUEDAD_AGREGADA', 'El nombre casó con varias personas y la tool sumó sus cifras en una'],
-        ['PREGUNTA_GEOMETRIA', 'Preguntó por mapa/calles/colores: ninguna tool ve la geometría'],
+        ['PREGUNTA_GEOMETRIA', 'Preguntó por calles/cercanía/colindancia: ninguna tool ve la geometría'],
+        ['VOCABULARIO_COLOR', 'Preguntó por un color y no se llamó a ninguna tool: falta el término en las descripciones'],
         ['PREGUNTA_VIVIENDAS', 'Preguntó por viviendas: ninguna tool las agrega'],
         ['NEGATIVA', 'El modelo se negó a responder (stop_reason: refusal)'],
         ['ERROR', 'La traza acabó en error'],
