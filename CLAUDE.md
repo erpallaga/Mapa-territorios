@@ -94,7 +94,9 @@ The `ask-territorios` agent is traced to Langfuse Cloud EU.
 
 ### RLS / DB performance note (from README)
 
-Row Level Security policies use an `is_admin()` function with `SECURITY DEFINER` and a fixed `search_path` to avoid recursive-policy slowdowns. If adding new RLS policies that need an admin check, reuse `is_admin()` rather than inlining a subquery against `profiles`.
+Row Level Security policies use an `is_admin()` function with `SECURITY DEFINER` and a fixed `search_path` to avoid recursive-policy slowdowns. If adding new RLS policies that need an admin check, reuse `is_admin()` rather than inlining a subquery against `profiles`. `is_admin()` requires `role = 'admin'` **and** `is_active = true`; it must stay executable by `authenticated` (policies evaluate it with the caller's privileges) but not by `anon`.
+
+Only one migration lives in the repo (`supabase/migrations/20260926115421_harden_rls_profiles_audit_is_admin.sql`); the earlier ones were applied from the Supabase dashboard and exist only in the project's migration history. Current policy intent: a user reads only their own profile and admins read all; `audit_logs` inserts must carry the caller as `actor_id`, and non-admins may only log `user_logout`; trigger functions are not executable by any API role (triggers don't check `EXECUTE` when firing).
 
 ### MCP server (`mcp-server/`)
 
@@ -113,7 +115,7 @@ It has its own `package.json`/`node_modules`, separate from the root app. Its on
 ## Notes
 
 - Entry point is `src/App.jsx` via `src/main.jsx`. `Dashboard` (which pulls in recharts) and `AdminPanel` are `React.lazy` chunks so the first load — the map — doesn't download them.
-- `scripts/convert-kml.js`, `process-kmls.js`, `debug-data.js`, `debug-merge.js` and `process-logo.js` are legacy one-off scripts, not wired into any npm script; `import-kmls.js` is the real importer. It writes compact JSON with 2-D coordinates rounded to 6 decimals, in natural file order, so regenerating it is deterministic.
+- `scripts/import-kmls.js` is the only KML importer (the old one-off `convert-kml`/`process-kmls`/`debug-*`/`process-logo` scripts were removed). It writes compact JSON with 2-D coordinates rounded to 6 decimals, in natural file order, so regenerating it is deterministic.
 - **Sheet content is untrusted HTML-wise.** Anything interpolated into a Leaflet popup or `divIcon` string goes through `escapeHtml` in `Map.jsx` — Leaflet sets those as `innerHTML`, and anyone with edit access to the sheet controls the text. React-rendered text is already escaped.
 - Deployment is Vercel with SPA rewrites (`vercel.json`); the build step's KML→JSON conversion runs automatically on each deploy.
 - The app and README are in Spanish (territory/zone/publisher domain terms: "territorio", "zona", "publicador", "vencido" = expired). Keep user-facing strings and MCP tool descriptions in Spanish for consistency with the existing codebase.
