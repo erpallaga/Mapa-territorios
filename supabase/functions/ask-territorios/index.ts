@@ -12,7 +12,7 @@ const corsHeaders = {
 // Solo lectura: este modelo únicamente puede consultar el estado de los
 // territorios a través de las tools del servidor MCP remoto (ver api/mcp.js).
 const MODEL = 'claude-haiku-4-5';
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 2048;
 const MCP_BETA_HEADER = 'mcp-client-2025-11-20';
 const MAX_MESSAGES = 20;
 const MAX_TOTAL_CHARS = 12000;

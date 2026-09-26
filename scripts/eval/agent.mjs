@@ -5,7 +5,7 @@
 // El system prompt NO está duplicado: se lee de Langfuse, que es la fuente única.
 
 const MODEL = 'claude-haiku-4-5';
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 2048;
 const MCP_BETA_HEADER = 'mcp-client-2025-11-20';
 const MAX_CONTINUACIONES = 3; // también duplicado en ask-territorios/index.ts
 const PROMPT_NAME = 'ask-territorios-system';

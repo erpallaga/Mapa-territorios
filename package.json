@@ -21,7 +21,6 @@
     "@supabase/supabase-js": "^2.98.0",
     "@tmcw/togeojson": "^7.1.2",
     "clsx": "^2.1.1",
-    "jimp": "^1.6.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.378.0",
     "papaparse": "^5.4.1",
