@@ -165,9 +165,16 @@ export function endOfDay(date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 }
 
-/** Días completos entre dos fechas (b - a). */
+/**
+ * Días de calendario entre dos fechas (b - a).
+ *
+ * `Math.round` y no `Math.floor`: entre dos medianoches locales que cruzan el
+ * cambio de hora de marzo hay 23 h, no 24, y con `floor` se perdía un día (del
+ * 20/03 al 30/03 salían 9). Como las dos fechas son medianoches, redondear
+ * nunca puede sumar un día que no toca.
+ */
 export function daysBetween(a, b) {
-    return Math.floor((startOfDay(b) - startOfDay(a)) / 86400000);
+    return Math.round((startOfDay(b) - startOfDay(a)) / 86400000);
 }
 
 /** Lunes de la semana de `date` (convención española: la semana empieza en lunes). */

@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { parseSheetDate } from './dates.js';
+import { daysBetween, parseSheetDate } from './dates.js';
 import { finalizacionesUltimos12Meses, ultimaFinalizacion } from './completion.js';
 
 /**
@@ -11,20 +11,49 @@ import { finalizacionesUltimos12Meses, ultimaFinalizacion } from './completion.j
 export const DIAS_VENCIMIENTO = Math.round(4 * 30.44); // 122
 
 /**
- * Fetches territory data from a Google Sheet published as CSV.
+ * La hoja de producción publicada como CSV. Vive aquí para que la web, el MCP
+ * y los scripts de auditoría lean exactamente la misma URL.
+ */
+export const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQugwzM2d854XUSxfQBG-UXngD8bhKp-Tt72E_BEgeS80PtoQXNQg0YTFOt70iNE3s3sr2b6NSOfZoo/pub?output=csv';
+
+/**
+ * Descarga y parsea la hoja. Lanza si la descarga falla.
+ *
+ * Es la versión que hay que usar cuando un fallo tiene que verse: si Google
+ * devuelve un 404 o una página de error, parsear eso como CSV daba "0
+ * territorios" (o territorios basura) sin que nadie se enterara, y el MCP
+ * contestaba con total seguridad que no había nada vencido.
+ *
  * @param {string} sheetUrl - The URL of the published CSV.
  * @returns {Promise<Array>} - Array of territory objects.
  */
-export async function fetchTerritoryData(sheetUrl) {
-    if (!sheetUrl) return [];
+export async function loadTerritoryData(sheetUrl) {
+    if (!sheetUrl) throw new Error('Falta la URL de la hoja de territorios.');
 
+    // El CSV publicado de Google se sirve con caché (y el navegador puede
+    // reutilizarlo encima). Sin romperla, un cambio hecho en la hoja puede
+    // tardar en aparecer y el panel parece "no actualizarse".
+    const response = await fetch(withCacheBuster(sheetUrl), { cache: 'no-store' });
+    if (!response.ok) {
+        throw new Error(`No se pudo descargar la hoja de territorios (HTTP ${response.status}).`);
+    }
+    const csvText = await response.text();
+    // Cuando la hoja deja de estar publicada, Google contesta 200 con una
+    // página HTML de login en vez del CSV.
+    if (/^\s*<(!doctype|html)/i.test(csvText)) {
+        throw new Error('La hoja de territorios no devolvió un CSV (¿ha dejado de estar publicada?).');
+    }
+    return parseTerritoryCsv(csvText);
+}
+
+/**
+ * Como `loadTerritoryData`, pero devuelve `[]` si algo falla. Se conserva por
+ * compatibilidad; el código nuevo debería usar `loadTerritoryData` y enseñar
+ * el error.
+ */
+export async function fetchTerritoryData(sheetUrl) {
     try {
-        // El CSV publicado de Google se sirve con caché (y el navegador puede
-        // reutilizarlo encima). Sin romperla, un cambio hecho en la hoja puede
-        // tardar en aparecer y el panel parece "no actualizarse".
-        const response = await fetch(withCacheBuster(sheetUrl), { cache: 'no-store' });
-        const csvText = await response.text();
-        return await parseTerritoryCsv(csvText);
+        return await loadTerritoryData(sheetUrl);
     } catch (error) {
         console.error("Error fetching sheet data:", error);
         return [];
@@ -65,9 +94,11 @@ export function parseTerritoryCsv(csvText) {
                     // 2: Número de viviendas (New)
                     // 3: Estado
                     // 4: Última fecha en que se completó*
-                    const id = row[0];
-                    const zone = row[1];
-                    const numViviendas = row[2];
+                    // Recortados: un espacio de más en la celda del número
+                    // hacía que el territorio no casara con su KML.
+                    const id = String(row[0] ?? '').trim();
+                    const zone = String(row[1] ?? '').trim();
+                    const numViviendas = String(row[2] ?? '').trim();
                     const statusValue = (row[3] || '').trim().toUpperCase();
                     const status = statusValue === 'LIBRE' ? 'free' : 'assigned';
                     const lastCompletedDate = row[4];
@@ -87,8 +118,8 @@ export function parseTerritoryCsv(csvText) {
 
                         // If there is a publisher name, update our latest info
                         if (p && p.trim() !== '') {
-                            publisher = p;
-                            assignedDate = d;
+                            publisher = p.trim();
+                            assignedDate = (d || '').trim();
 
                             history.push({
                                 publisher: p.trim(),
@@ -111,12 +142,14 @@ export function parseTerritoryCsv(csvText) {
                     // Calculate expired status (>= 4 months assigned)
                     let isExpired = false;
                     let expiredDays = 0;
-                    if (status === 'assigned' && assignedDate && assignedDate.trim() !== '') {
+                    if (status === 'assigned' && assignedDate) {
                         const assignedDateObj = parseSheetDate(assignedDate);
                         if (assignedDateObj) {
-                            const now = new Date();
-                            const diffMs = now - assignedDateObj;
-                            const diffDaysTotal = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                            // Días de calendario, igual que `caducidad()` en el
+                            // MCP: con una resta de milisegundos, el cambio de
+                            // hora de marzo le quitaba un día al recuento y el
+                            // panel y el agente discrepaban en "vence hoy".
+                            const diffDaysTotal = daysBetween(assignedDateObj, new Date());
                             if (diffDaysTotal >= DIAS_VENCIMIENTO) {
                                 isExpired = true;
                                 expiredDays = diffDaysTotal - DIAS_VENCIMIENTO; // Days PAST the 4-month mark

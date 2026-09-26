@@ -16,7 +16,7 @@
 
 import fs from 'node:fs';
 
-import { fetchTerritoryData, parseTerritoryCsv } from '../src/lib/sheets.js';
+import { SHEET_CSV_URL, loadTerritoryData, parseTerritoryCsv } from '../src/lib/sheets.js';
 import { formatSheetDate } from '../src/lib/dates.js';
 import {
   CATEGORIA_0_6,
@@ -28,8 +28,7 @@ import {
   ultimaFinalizacionDetallada,
 } from '../src/lib/completion.js';
 
-const SHEET_URL_POR_DEFECTO =
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQugwzM2d854XUSxfQBG-UXngD8bhKp-Tt72E_BEgeS80PtoQXNQg0YTFOt70iNE3s3sr2b6NSOfZoo/pub?output=csv';
+const SHEET_URL_POR_DEFECTO = SHEET_CSV_URL;
 
 const args = process.argv.slice(2);
 const detalle = args.includes('--detalle');
@@ -40,7 +39,7 @@ const hoy = new Date();
 
 const territorios = (
   /^https?:\/\//.test(origen)
-    ? await fetchTerritoryData(origen)
+    ? await loadTerritoryData(origen)
     : await parseTerritoryCsv(fs.readFileSync(origen, 'utf8'))
 ).filter((t) => t.id && String(t.id).trim());
 

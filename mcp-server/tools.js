@@ -64,6 +64,18 @@ function describirRango(rango, fechasNoReconocidas = 0, fechasAmbiguas = 0) {
   };
 }
 
+/**
+ * ¿Es este el territorio que se pide? El modelo a veces pasa "045",
+ * "Territorio 45" o " 45 " en vez de "45"; sin esto contestaba que el
+ * territorio no existe.
+ */
+function mismoId(idHoja, pedido) {
+  const a = String(idHoja ?? "").trim();
+  const b = String(pedido ?? "").trim().replace(/^(territorio|terr\.?|t)\s*/i, "").replace(/^#/, "");
+  if (a === b) return true;
+  return /^\d+$/.test(a) && /^\d+$/.test(b) && Number(a) === Number(b);
+}
+
 export function registerTerritorioTools(server) {
   const ListInputSchema = z.object({
     estado: z.enum(["libre", "asignado", "todos"])
@@ -111,10 +123,8 @@ fecha de asignación, fecha de caducidad de esa asignación y días que faltan p
         const target = estado === "libre" ? "free" : "assigned";
         filtered = filtered.filter((t) => t.status === target);
       }
-      if (zona) {
-        const zonaLower = zona.toLowerCase();
-        filtered = filtered.filter((t) => (t.zone || "").toLowerCase().includes(zonaLower));
-      }
+      // Igual que en el resto de tools: sin acentos ni mayúsculas ("sarria" = "Sarrià").
+      if (zona) filtered = filtered.filter((t) => coincideTexto(t.zone, zona));
 
       const total = filtered.length;
       const page = filtered.slice(offset, offset + limit);
@@ -182,7 +192,7 @@ Si el ID no existe, devuelve un mensaje de error indicándolo.`,
     async ({ id }) => {
       const all = await getTerritories();
       const indice = indexarPublicadores(all);
-      const t = all.find((x) => x.id === id);
+      const t = all.find((x) => mismoId(x.id, id));
 
       if (!t) {
         return {
@@ -264,10 +274,7 @@ caducó y los días de retraso desde entonces.`,
       const indice = indexarPublicadores(all);
 
       let expired = all.filter((t) => t.isExpired);
-      if (zona) {
-        const zonaLower = zona.toLowerCase();
-        expired = expired.filter((t) => (t.zone || "").toLowerCase().includes(zonaLower));
-      }
+      if (zona) expired = expired.filter((t) => coincideTexto(t.zone, zona));
       expired.sort((a, b) => b.expiredDays - a.expiredDays);
 
       const total = expired.length;
@@ -821,7 +828,7 @@ ahora (con sus ids), cuántos están vencidos, asignaciones y finalizaciones del
           case "nombre": return a.nombre.localeCompare(b.nombre);
           case "finalizaciones": return b.finalizacionesEnRango - a.finalizacionesEnRango || a.nombre.localeCompare(b.nombre);
           case "asignaciones": return b.asignacionesEnRango - a.asignacionesEnRango || a.nombre.localeCompare(b.nombre);
-          case "ultima_actividad": return String(b.ultimaActividad || "").localeCompare(String(a.ultimaActividad || ""));
+          case "ultima_actividad": return String(b.ultimaActividad || "").localeCompare(String(a.ultimaActividad || "")) || a.nombre.localeCompare(b.nombre);
           default: return b.territoriosActuales - a.territoriosActuales || a.nombre.localeCompare(b.nombre);
         }
       });
@@ -880,6 +887,7 @@ días/meses transcurridos.`,
     },
     async ({ zona, mesesMinimos, incluirNuncaCompletados, limit, offset }) => {
       const all = await getTerritories();
+      const indice = indexarPublicadores(all);
       const ahora = new Date();
       const umbralDias = mesesMinimos * 30.44;
 
@@ -892,7 +900,7 @@ días/meses transcurridos.`,
             id: t.id,
             zona: t.zone || null,
             estado: t.status === "free" ? "libre" : "asignado",
-            publicador: t.status === "assigned" ? (t.publisher || null) : null,
+            publicador: t.status === "assigned" && t.publisher ? nombreCanonico(indice, t.publisher) : null,
             ultimaFinalizacion: ultima ? formatISODate(ultima) : null,
             diasSinCompletar: dias,
             mesesSinCompletar: dias === null ? null : Math.round((dias / 30.44) * 10) / 10

@@ -7,20 +7,27 @@
 export function mergeTerritoryData(geoJson, sheetData) {
     if (!geoJson || !sheetData) return geoJson;
 
+    // Índice por id: con `find` dentro del `map` el merge era cuadrático.
+    const byId = new Map();
+    for (const row of sheetData) {
+        const id = String(row?.id ?? '').trim();
+        if (id && !byId.has(id)) byId.set(id, row);
+    }
+
     const mergedFeatures = geoJson.features.map(feature => {
         // Try to match by name first
-        let territoryId = feature.properties.name;
+        let territoryId = String(feature.properties?.name ?? '').trim();
 
         // If name doesn't look like an ID, try extracting from sourceFile
         // Example: "TERRITORIO 1.kml" -> "1"
-        if (feature.properties.sourceFile) {
+        if (feature.properties?.sourceFile) {
             const match = feature.properties.sourceFile.match(/TERRITORIO\s+(\d+)\.kml/i);
             if (match) {
                 territoryId = match[1];
             }
         }
 
-        const data = sheetData.find(row => row.id === territoryId);
+        const data = byId.get(territoryId);
 
         if (data) {
             return {
