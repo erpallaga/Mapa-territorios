@@ -61,6 +61,9 @@ export async function getSystemPrompt(): Promise<{
 
         if (!res.ok) {
             console.warn('[langfuse] prompt fetch failed', res.status);
+            // Igual que en el catch: una copia caducada del prompt de verdad es
+            // mejor que el fallback, que puede ir por detrás de Langfuse.
+            if (cache) return { text: cache.text, name: cache.name, version: cache.version, fetched: true };
             return { text: FALLBACK_SYSTEM_PROMPT, name: null, version: null, fetched: true };
         }
 
