@@ -1,7 +1,7 @@
 import React from 'react';
 import { cn } from '../lib/utils';
 
-export function Legend({ viewMode, expiredListExpanded }) {
+export function Legend({ viewMode, expiredListExpanded, hasExpiredList = true }) {
     // Cada vista pinta con su propia escala; la leyenda tiene que enumerar
     // exactamente los colores que `Map.jsx` puede llegar a poner.
     const itemsPorVista = {
@@ -40,7 +40,8 @@ export function Legend({ viewMode, expiredListExpanded }) {
     // - current / 12months: same as collapsed expired
     // - expired expanded: above the list (~132px) + header (~68px) + tight gap (~4px)
     // - expired collapsed: above the header (~68px) + tight gap (~4px)
-    const positionClass = viewMode !== 'expired'
+    // Sin caducados no hay lista abajo, y la leyenda se quedaba flotando a media pantalla.
+    const positionClass = viewMode !== 'expired' || !hasExpiredList
         ? "bottom-[68px] left-4 md:bottom-4 md:max-w-[200px]"
         : expiredListExpanded
             ? "bottom-[200px] left-4 md:bottom-[232px] md:max-w-[200px]"

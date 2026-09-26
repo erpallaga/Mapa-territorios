@@ -11,9 +11,12 @@ export function AuthProvider({ children }) {
     // Fetch user profile from the profiles table with retry and backoff
     const fetchProfile = useCallback(async (userId, retries = 3, delay = 1000) => {
         for (let i = 0; i < retries; i++) {
+            // El `return` dentro del executor de una Promise no hace nada, así
+            // que el timer nunca se limpiaba: se guarda fuera y se limpia en el
+            // finally.
+            let timer;
             const timeoutPromise = new Promise((_, reject) => {
-                const timer = setTimeout(() => reject(new Error('Timeout')), 10000); // 10s timeout per attempt
-                return () => clearTimeout(timer);
+                timer = setTimeout(() => reject(new Error('Timeout')), 10000); // 10s timeout per attempt
             });
 
             try {
@@ -40,6 +43,8 @@ export function AuthProvider({ children }) {
                 console.error(`[Auth] Profile fetch attempt ${i + 1} failed:`, error.message);
                 if (i === retries - 1) return null;
                 await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, i)));
+            } finally {
+                clearTimeout(timer);
             }
         }
         return null;
@@ -48,9 +53,15 @@ export function AuthProvider({ children }) {
     useEffect(() => {
         let mounted = true;
         let authListener = null;
+        // Cada evento de auth incrementa esto. Si llega uno nuevo mientras el
+        // anterior aún espera su perfil (p. ej. SIGNED_OUT durante el fetch de
+        // SIGNED_IN), el viejo no debe pisar el estado con un perfil caducado.
+        let ultimoEvento = 0;
 
         const handleAuthChange = async (event, session) => {
             if (!mounted) return;
+            const esteEvento = ++ultimoEvento;
+            const vigente = () => mounted && esteEvento === ultimoEvento;
 
             const currentUser = session?.user ?? null;
             setUser(currentUser);
@@ -64,7 +75,7 @@ export function AuthProvider({ children }) {
 
                     const p = await fetchProfile(currentUser.id);
 
-                    if (mounted) {
+                    if (vigente()) {
                         setProfile(prevProfile => {
                             if (p) return p;
                             // If we already have a profile and fetch failed (null), KEEP the old one
@@ -79,7 +90,7 @@ export function AuthProvider({ children }) {
                     }
                 } catch (err) {
                     console.error("Profile load error:", err);
-                    if (mounted) setLoading(false);
+                    if (vigente()) setLoading(false);
                 }
             } else {
                 if (mounted) {
@@ -94,7 +105,17 @@ export function AuthProvider({ children }) {
             await handleAuthChange('INITIAL', session);
 
             if (mounted) {
-                const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
+                const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+                    // INITIAL_SESSION repite la sesión que ya ha procesado
+                    // `getSession()` arriba: atenderlo duplicaba el fetch del perfil.
+                    if (event === 'INITIAL_SESSION') return;
+                    // supabase-js ejecuta este callback mientras retiene su lock
+                    // de auth. Hacer `await` aquí de otra llamada a Supabase (el
+                    // fetch del perfil) puede quedarse bloqueado esperando ese
+                    // mismo lock; la documentación pide diferirlo fuera del
+                    // callback. Es la causa probable de los "Timeout" del perfil.
+                    setTimeout(() => handleAuthChange(event, session), 0);
+                });
                 authListener = subscription;
             }
         };
@@ -121,12 +142,18 @@ export function AuthProvider({ children }) {
     }, []);
 
     const signOut = useCallback(async () => {
+        // El registro de auditoría es secundario: si falla (sin red, RLS), el
+        // usuario tiene que poder cerrar sesión igualmente.
         if (user && profile) {
-            await supabase.from('audit_logs').insert({
-                actor_id: user.id,
-                action: 'user_logout',
-                target_email: profile.email,
-            })
+            try {
+                await supabase.from('audit_logs').insert({
+                    actor_id: user.id,
+                    action: 'user_logout',
+                    target_email: profile.email,
+                })
+            } catch (err) {
+                console.warn('[Auth] Could not write logout audit log:', err)
+            }
         }
         const { error } = await supabase.auth.signOut()
         if (error) console.error('Error signing out:', error)

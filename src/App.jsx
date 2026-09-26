@@ -1,16 +1,42 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { Map } from './components/Map'
 import { TerritoryDetails } from './components/TerritoryDetails'
-import { Dashboard } from './components/Dashboard'
 import { AskTerritorios } from './components/AskTerritorios'
-import { AdminPanel } from './components/AdminPanel'
 import { LoginPage, AccessPending } from './components/LoginPage'
 import { useAuth } from './context/AuthContext'
-import { fetchTerritoryData } from './lib/sheets'
+import { SHEET_CSV_URL, loadTerritoryData } from './lib/sheets'
 import { mergeTerritoryData } from './lib/territories'
-import { LayoutDashboard, Map as MapIcon, ShieldCheck, LogOut } from 'lucide-react'
+import { LayoutDashboard, Map as MapIcon, ShieldCheck, LogOut, AlertTriangle, RefreshCw } from 'lucide-react'
 import { cn } from './lib/utils'
 import { UserAvatar } from './components/UserAvatar'
+
+// Bajo demanda: el Resumen arrastra recharts y el panel de admin solo lo ven
+// los administradores. Así la primera carga (el mapa) no los descarga.
+const Dashboard = lazy(() => import('./components/Dashboard').then(m => ({ default: m.Dashboard })))
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })))
+
+function Cargando() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  )
+}
+
+// Si la pestaña vuelve a estar visible y los datos tienen más de esto, se
+// recargan. La app se deja abierta en el móvil durante días, y sin esto la
+// hoja podía haber cambiado mucho sin que el mapa se enterase.
+const RECARGA_AL_VOLVER_MS = 5 * 60 * 1000;
+// Una red que no contesta no puede dejar la rueda girando para siempre.
+const TIMEOUT_CARGA_MS = 20000;
+
+function conTimeout(promise, ms) {
+  let timer;
+  const limite = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('La carga de datos está tardando demasiado. Comprueba la conexión.')), ms);
+  });
+  return Promise.race([promise, limite]).finally(() => clearTimeout(timer));
+}
 
 function App() {
   const { user, profile, loading: authLoading, signOut, isAdmin, isActive } = useAuth()
@@ -18,44 +44,65 @@ function App() {
   const [territories, setTerritories] = useState(null);
   const [selectedTerritory, setSelectedTerritory] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  // Cambia en cada carga: el mapa lo usa para volver a pintar los polígonos,
+  // porque el <GeoJSON> de react-leaflet ignora los cambios de `data`.
+  const [dataVersion, setDataVersion] = useState(0);
+  const loadedAt = useRef(0);
+  const loadingRef = useRef(false);
 
-  // Safety timeout to ensure loading is at least false after 10s
-  useEffect(() => {
-    if (loading) {
-      const timer = setTimeout(() => {
-        console.warn("[App] Loading safety timeout reached");
-        setLoading(false);
-      }, 10000);
-      return () => clearTimeout(timer);
+  const loadData = useCallback(async ({ background = false } = {}) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    if (!background) setLoading(true);
+    try {
+      const [geoJson, sheetData] = await conTimeout(Promise.all([
+        fetch('/data/territories.json').then(r => {
+          if (!r.ok) throw new Error(`No se pudo cargar el mapa (HTTP ${r.status}).`);
+          return r.json();
+        }),
+        // Antes un fallo de la hoja devolvía [] en silencio y el mapa salía
+        // entero en rojo, como si todo estuviera asignado.
+        loadTerritoryData(SHEET_CSV_URL),
+      ]), TIMEOUT_CARGA_MS);
+      const mergedData = mergeTerritoryData(geoJson, sheetData);
+      setTerritories(mergedData);
+      setDataVersion(v => v + 1);
+      setLoadError(null);
+      loadedAt.current = Date.now();
+      // El panel de detalle guarda una copia del territorio: se sustituye por
+      // la versión recién cargada para que no enseñe datos viejos.
+      setSelectedTerritory(prev => {
+        if (!prev?.id) return prev;
+        const fresh = mergedData.features.find(f => f.properties?.id === prev.id);
+        return fresh ? fresh.properties : prev;
+      });
+    } catch (error) {
+      console.error("[App] Failed to load data:", error);
+      // En una recarga en segundo plano se conservan los datos que ya había.
+      if (!background) setLoadError(error.message || 'No se pudieron cargar los datos.');
+    } finally {
+      loadingRef.current = false;
+      setLoading(false);
     }
-  }, [loading]);
+  }, []);
 
   useEffect(() => {
     // Only load data when user is authenticated and active
     if (!user?.id || !isActive) return;
-
-    async function loadData() {
-      console.log("[App] loadData started");
-      try {
-        console.log("[App] Fetching territories.json...");
-        const geoResponse = await fetch('/data/territories.json');
-        const geoJson = await geoResponse.json();
-        console.log("[App] Fetching sheet data...");
-        const sheetData = await fetchTerritoryData('https://docs.google.com/spreadsheets/d/e/2PACX-1vQugwzM2d854XUSxfQBG-UXngD8bhKp-Tt72E_BEgeS80PtoQXNQg0YTFOt70iNE3s3sr2b6NSOfZoo/pub?output=csv');
-        console.log("[App] Merging data...");
-        const mergedData = mergeTerritoryData(geoJson, sheetData);
-        setTerritories(mergedData);
-        console.log("[App] Data loaded successfully");
-      } catch (error) {
-        console.error("[App] Failed to load data:", error);
-      } finally {
-        console.log("[App] Setting app loading to false");
-        setLoading(false);
-      }
-    }
-
     loadData();
-  }, [user?.id, isActive]);
+  }, [user?.id, isActive, loadData]);
+
+  useEffect(() => {
+    if (!user?.id || !isActive) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && loadedAt.current && Date.now() - loadedAt.current > RECARGA_AL_VOLVER_MS) {
+        loadData({ background: true });
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [user?.id, isActive, loadData]);
 
   const handleTerritoryClick = (territory) => {
     setSelectedTerritory(territory);
@@ -128,10 +175,25 @@ function App() {
       {/* Main Content */}
       <main className="flex-1 relative h-full pt-16 md:pt-0">
         {view === 'admin' && isAdmin ? (
-          <AdminPanel />
+          <Suspense fallback={<Cargando />}>
+            <AdminPanel />
+          </Suspense>
         ) : loading ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <Cargando />
+        ) : loadError && !territories ? (
+          <div className="h-full flex items-center justify-center p-6">
+            <div className="max-w-sm text-center bg-white border border-gray-200 rounded-xl shadow-sm p-6">
+              <AlertTriangle className="w-8 h-8 text-amber-500 mx-auto mb-3" />
+              <h2 className="font-semibold text-gray-900 mb-1">No se pudieron cargar los territorios</h2>
+              <p className="text-sm text-gray-500 mb-4">{loadError}</p>
+              <button
+                onClick={() => loadData()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition-colors"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Reintentar
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -139,6 +201,7 @@ function App() {
               <div className="h-full w-full relative">
                 <Map
                   territories={territories}
+                  dataVersion={dataVersion}
                   onTerritoryClick={handleTerritoryClick}
                   selectedTerritory={selectedTerritory}
                 />
@@ -152,7 +215,9 @@ function App() {
             {view === 'dashboard' && (
               <div className="h-full p-8 overflow-y-auto">
                 <div className="max-w-5xl mx-auto h-[600px]">
-                  <Dashboard territories={territories?.features} />
+                  <Suspense fallback={<Cargando />}>
+                    <Dashboard territories={territories?.features} />
+                  </Suspense>
                 </div>
               </div>
             )}

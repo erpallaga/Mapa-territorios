@@ -53,6 +53,8 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                     <button
                         onClick={onClose}
                         className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                        title="Cerrar"
+                        aria-label="Cerrar"
                     >
                         <X className="w-5 h-5 text-gray-500" />
                     </button>
@@ -61,13 +63,16 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                     {/* Status Badge */}
+                    {/* Sin fila en la hoja no hay estado: antes salía "Asignado". */}
                     <div className={cn(
                         "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium",
                         territory.status === 'free'
                             ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
+                            : territory.status === 'assigned'
+                                ? "bg-red-100 text-red-800"
+                                : "bg-gray-100 text-gray-700"
                     )}>
-                        {territory.status === 'free' ? 'Libre' : 'Asignado'}
+                        {territory.status === 'free' ? 'Libre' : territory.status === 'assigned' ? 'Asignado' : 'Sin datos en la hoja'}
                     </div>
 
                     {/* Details Grid */}
@@ -75,12 +80,12 @@ export function TerritoryDetails({ territory, onClose, isOpen }) {
                         <DetailRow
                             icon={<User className="w-5 h-5 text-gray-400" />}
                             label="Publicador Asignado"
-                            value={territory.status === 'free' ? '-' : (territory.publisher || '-')}
+                            value={territory.status === 'assigned' ? (territory.publisher || '-') : '-'}
                         />
                         <DetailRow
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
                             label="Fecha de Inicio"
-                            value={territory.status === 'free' ? '-' : fechaLegible(territory.assignedDate)}
+                            value={territory.status === 'assigned' ? fechaLegible(territory.assignedDate) : '-'}
                         />
                         <DetailRow
                             icon={<Calendar className="w-5 h-5 text-gray-400" />}
