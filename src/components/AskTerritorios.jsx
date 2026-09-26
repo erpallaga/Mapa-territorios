@@ -92,6 +92,10 @@ export function AskTerritorios() {
     // Agrupa los mensajes de una misma conversación en Langfuse. Es solo
     // telemetría: el servidor valida la forma y nunca lo usa para autorizar.
     const [sessionId, setSessionId] = useState(() => crypto.randomUUID())
+    // La conversación a la que pertenece la petición en curso. Si el usuario
+    // pulsa "Nueva conversación" mientras espera, la respuesta que llega tarde
+    // no debe resucitar la conversación que acaba de borrar.
+    const sessionRef = useRef(sessionId)
     const scrollRef = useRef(null)
     const viewport = useVisualViewport()
 
@@ -100,6 +104,13 @@ export function AskTerritorios() {
     const overlayStyle = viewport
         ? { top: viewport.offsetTop, height: viewport.height, bottom: 'auto' }
         : undefined
+
+    useEffect(() => {
+        if (!isOpen) return
+        const onKeyDown = (e) => { if (e.key === 'Escape') setIsOpen(false) }
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [isOpen])
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -117,6 +128,7 @@ export function AskTerritorios() {
         setQuestion('')
         setLoading(true)
         setError('')
+        const requestSession = sessionId
 
         try {
             const { data, error: invokeError } = await supabase.functions.invoke('ask-territorios', {
@@ -125,20 +137,30 @@ export function AskTerritorios() {
 
             if (invokeError) throw invokeError
             if (data?.error) throw new Error(data.error)
+            if (sessionRef.current !== requestSession) return
 
             setMessages([...nextMessages, { role: 'assistant', content: data.answer }])
         } catch (err) {
             console.error('[AskTerritorios] Error:', err)
+            if (sessionRef.current !== requestSession) return
+            // La pregunta vuelve al cuadro de texto en vez de quedarse en el
+            // historial sin respuesta: si no, el siguiente envío mandaba dos
+            // preguntas seguidas y el modelo contestaba a las dos mezcladas.
+            setMessages(messages)
+            setQuestion(trimmed)
             setError('No se pudo obtener una respuesta. Inténtalo de nuevo.')
         } finally {
-            setLoading(false)
+            if (sessionRef.current === requestSession) setLoading(false)
         }
     }
 
     const handleNewConversation = () => {
+        const nueva = crypto.randomUUID()
+        sessionRef.current = nueva
         setMessages([])
         setError('')
-        setSessionId(crypto.randomUUID())
+        setLoading(false)
+        setSessionId(nueva)
     }
 
     return (

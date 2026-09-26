@@ -37,21 +37,30 @@ Deno.serve(async (req: Request) => {
             });
         }
 
+        // Admin y además activo: un admin desactivado conserva role='admin'.
         const { data: profile, error: profileError } = await userClient
             .from('profiles')
-            .select('role')
+            .select('role, is_active')
             .eq('id', user.id)
             .single();
 
-        if (profileError || profile?.role !== 'admin') {
+        if (profileError || profile?.role !== 'admin' || profile?.is_active !== true) {
             return new Response(JSON.stringify({ error: 'Admin access required' }), {
                 status: 403,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
         }
 
-        const { targetUserId } = await req.json();
-        if (!targetUserId) {
+        let targetUserId: unknown;
+        try {
+            ({ targetUserId } = await req.json());
+        } catch {
+            return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        if (!targetUserId || typeof targetUserId !== 'string') {
             return new Response(JSON.stringify({ error: 'targetUserId is required' }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -12,10 +12,15 @@ const corsHeaders = {
 // Solo lectura: este modelo únicamente puede consultar el estado de los
 // territorios a través de las tools del servidor MCP remoto (ver api/mcp.js).
 const MODEL = 'claude-haiku-4-5';
-const MAX_TOKENS = 1024;
+const MAX_TOKENS = 2048;
 const MCP_BETA_HEADER = 'mcp-client-2025-11-20';
 const MAX_MESSAGES = 20;
 const MAX_TOTAL_CHARS = 12000;
+// Las tools del conector MCP se ejecutan en un bucle en los servidores de
+// Anthropic. Si ese bucle agota sus iteraciones, la respuesta vuelve con
+// stop_reason 'pause_turn' y sin la contestación final: hay que reenviar lo
+// que llevamos para que continúe. Tope para no encadenar peticiones sin fin.
+const MAX_CONTINUACIONES = 3;
 
 // El sessionId sólo agrupa la conversación en Langfuse. Viene del cliente, así
 // que se valida la forma y se descarta si no encaja: nunca se usa para autorizar.
@@ -35,6 +40,9 @@ Deno.serve(async (req: Request) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders });
     }
+
+    // Fuera del try para poder cerrar la traza también si algo revienta a mitad.
+    let trace: ReturnType<typeof createTrace> | null = null;
 
     try {
         const authHeader = req.headers.get('Authorization');
@@ -75,7 +83,16 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        const { messages, sessionId: rawSessionId } = await req.json();
+        let body;
+        try {
+            body = await req.json();
+        } catch {
+            return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        const { messages, sessionId: rawSessionId } = body ?? {};
         const sessionId = typeof rawSessionId === 'string' && UUID_RE.test(rawSessionId)
             ? rawSessionId
             : undefined;
@@ -118,7 +135,7 @@ Deno.serve(async (req: Request) => {
 
         // A partir de aquí la petición es válida y vamos a gastar tokens, así que
         // merece la pena trazarla. Las peticiones mal formadas no se trazan.
-        const trace = createTrace({
+        trace = createTrace({
             name: 'ask-territorios',
             userId: user.id,
             sessionId,
@@ -146,57 +163,76 @@ Deno.serve(async (req: Request) => {
 
         // El conector MCP de la API de Anthropic llama él mismo a las tools
         // del servidor remoto (api/mcp.js) dentro de esta misma petición —
-        // no hace falta un bucle manual de tool-use en esta función.
+        // no hace falta un bucle manual de tool-use en esta función; el único
+        // bucle es el de reanudar un 'pause_turn' (ver MAX_CONTINUACIONES).
         const generation = trace.startSpan('anthropic-messages', 'generation');
         const anthropicMessages = messages.map((m: { role: string; content: string }) => ({
             role: m.role,
             content: m.content.trim(),
         }));
 
-        const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': anthropicApiKey,
-                'anthropic-version': '2023-06-01',
-                'anthropic-beta': MCP_BETA_HEADER,
-            },
-            body: JSON.stringify({
-                model: MODEL,
-                max_tokens: MAX_TOKENS,
-                system: systemPrompt.text,
-                mcp_servers: [{
-                    type: 'url',
-                    name: 'territorios',
-                    url: mcpServerUrl,
-                    authorization_token: mcpSharedSecret,
-                }],
-                tools: [{ type: 'mcp_toolset', mcp_server_name: 'territorios' }],
-                messages: anthropicMessages,
-            }),
-        });
+        const conversation: Array<{ role: string; content: unknown }> = [...anthropicMessages];
+        const contentBlocks: Array<Record<string, unknown>> = [];
+        const usage = { input: 0, output: 0, cache_read: 0 };
+        let result: Record<string, any> = {};
+        let continuaciones = 0;
 
-        if (!anthropicResponse.ok) {
-            const errText = await anthropicResponse.text();
-            console.error('Anthropic API error:', anthropicResponse.status, errText);
-            generation.end({
-                model: MODEL,
-                input: anthropicMessages,
-                level: 'ERROR',
-                statusMessage: `Anthropic ${anthropicResponse.status}: ${errText}`,
+        while (true) {
+            const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': anthropicApiKey,
+                    'anthropic-version': '2023-06-01',
+                    'anthropic-beta': MCP_BETA_HEADER,
+                },
+                body: JSON.stringify({
+                    model: MODEL,
+                    max_tokens: MAX_TOKENS,
+                    system: systemPrompt.text,
+                    mcp_servers: [{
+                        type: 'url',
+                        name: 'territorios',
+                        url: mcpServerUrl,
+                        authorization_token: mcpSharedSecret,
+                    }],
+                    tools: [{ type: 'mcp_toolset', mcp_server_name: 'territorios' }],
+                    messages: conversation,
+                }),
             });
-            trace.setError(`Anthropic ${anthropicResponse.status}`);
-            fireAndForget(trace.flush());
-            return new Response(JSON.stringify({ error: 'Failed to get an answer' }), {
-                status: 502,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
+
+            if (!anthropicResponse.ok) {
+                const errText = await anthropicResponse.text();
+                console.error('Anthropic API error:', anthropicResponse.status, errText);
+                generation.end({
+                    model: MODEL,
+                    input: anthropicMessages,
+                    level: 'ERROR',
+                    statusMessage: `Anthropic ${anthropicResponse.status}: ${errText}`,
+                });
+                trace.setError(`Anthropic ${anthropicResponse.status}`);
+                fireAndForget(trace.flush());
+                return new Response(JSON.stringify({ error: 'Failed to get an answer' }), {
+                    status: 502,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                });
+            }
+
+            result = await anthropicResponse.json();
+            const blocks: Array<Record<string, unknown>> = result.content ?? [];
+            contentBlocks.push(...blocks);
+            usage.input += result.usage?.input_tokens ?? 0;
+            usage.output += result.usage?.output_tokens ?? 0;
+            usage.cache_read += result.usage?.cache_read_input_tokens ?? 0;
+
+            if (result.stop_reason !== 'pause_turn' || continuaciones >= MAX_CONTINUACIONES) break;
+            // Se reenvía el turno pausado tal cual (con sus bloques de tool) y
+            // el servidor retoma donde lo dejó; no hace falta un "continúa".
+            conversation.push({ role: 'assistant', content: blocks });
+            continuaciones++;
         }
 
-        const result = await anthropicResponse.json();
-        const contentBlocks: Array<Record<string, unknown>> = result.content ?? [];
-
-        const answer = contentBlocks
+        let answer = contentBlocks
             .filter((block) => block.type === 'text')
             .map((block) => block.text as string)
             .join('\n')
@@ -209,18 +245,15 @@ Deno.serve(async (req: Request) => {
             modelParameters: { max_tokens: MAX_TOKENS },
             input: anthropicMessages,
             output: answer || contentBlocks,
-            usage: {
-                input: result.usage?.input_tokens ?? 0,
-                output: result.usage?.output_tokens ?? 0,
-                cache_read: result.usage?.cache_read_input_tokens ?? 0,
-            },
+            usage,
             promptName: systemPrompt.name,
             promptVersion: systemPrompt.version,
             metadata: {
                 stop_reason: result.stop_reason ?? 'unknown',
                 tool_call_count: toolUses.length,
+                continuations: continuaciones,
             },
-            level: result.stop_reason === 'refusal' ? 'WARNING' : 'DEFAULT',
+            level: result.stop_reason === 'refusal' || !answer ? 'WARNING' : 'DEFAULT',
         });
 
         // Anthropic ejecuta las tools en su lado, así que sólo podemos reconstruir
@@ -255,6 +288,21 @@ Deno.serve(async (req: Request) => {
             });
         }
 
+        // Sin texto (se agotaron los tokens en llamadas a tools, o el bucle de
+        // tools siguió en pausa) antes se devolvía un 200 con la respuesta
+        // vacía y el usuario veía una burbuja en blanco.
+        if (!answer) {
+            trace.setError(`empty answer (stop_reason=${result.stop_reason ?? 'unknown'})`);
+            fireAndForget(trace.flush());
+            return new Response(JSON.stringify({ error: 'No se obtuvo ninguna respuesta. Prueba a formular la pregunta de otra manera.' }), {
+                status: 502,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        if (result.stop_reason === 'max_tokens') {
+            answer += '\n\n(Respuesta incompleta: se ha alcanzado el límite de longitud.)';
+        }
+
         trace.setTrace({ output: answer });
         fireAndForget(trace.flush());
 
@@ -264,6 +312,10 @@ Deno.serve(async (req: Request) => {
         });
     } catch (error) {
         console.error('ask-territorios error:', error);
+        if (trace) {
+            trace.setError(error instanceof Error ? error.message : String(error));
+            fireAndForget(trace.flush());
+        }
         return new Response(JSON.stringify({ error: 'Internal server error' }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },

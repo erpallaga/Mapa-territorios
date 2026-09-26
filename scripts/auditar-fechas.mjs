@@ -14,9 +14,9 @@
 import fs from 'node:fs';
 import Papa from 'papaparse';
 import { parseSheetDateDetailed, formatISODate } from '../src/lib/dates.js';
+import { SHEET_CSV_URL } from '../src/lib/sheets.js';
 
-const SHEET_URL_POR_DEFECTO =
-  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQugwzM2d854XUSxfQBG-UXngD8bhKp-Tt72E_BEgeS80PtoQXNQg0YTFOt70iNE3s3sr2b6NSOfZoo/pub?output=csv';
+const SHEET_URL_POR_DEFECTO = SHEET_CSV_URL;
 
 const origen = process.argv[2] || process.env.TERRITORIOS_SHEET_URL || SHEET_URL_POR_DEFECTO;
 

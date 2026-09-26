@@ -28,8 +28,9 @@ export default defineConfig([
   },
   {
     // Código que corre en Node, no en el navegador: el servidor MCP, el endpoint
-    // remoto de Vercel y los scripts de build. Necesitan process, Buffer, etc.
-    files: ['mcp-server/**/*.js', 'api/**/*.js', 'scripts/**/*.{js,mjs}'],
+    // remoto de Vercel, los scripts de build y los tests (`node --test`).
+    // Necesitan process, Buffer, etc.
+    files: ['mcp-server/**/*.js', 'api/**/*.js', 'scripts/**/*.{js,mjs}', 'src/**/*.test.js'],
     languageOptions: {
       globals: globals.node,
     },

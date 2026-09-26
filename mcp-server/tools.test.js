@@ -33,7 +33,18 @@ const CSV = `Núm. de terr.,Zona,Viviendas,Estado,Última fecha,Publicador,Asign
 `;
 
 // Servidor local que hace de Sheet publicado, para no tocar la red de verdad.
-const server = http.createServer((_req, res) => {
+// `/caido` y `/despublicado` simulan las dos maneras en que Google falla.
+const server = http.createServer((req, res) => {
+    if (req.url.startsWith('/caido')) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('error');
+        return;
+    }
+    if (req.url.startsWith('/despublicado')) {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end('<!DOCTYPE html><html><body>Inicia sesión</body></html>');
+        return;
+    }
     res.writeHead(200, { 'Content-Type': 'text/csv' });
     res.end(CSV);
 });
@@ -357,4 +368,37 @@ test('la fila de totales de la hoja no cuenta como un territorio', async () => {
 
     const listado = await call('territorios_listar', {});
     assert.ok(listado.datos.territorios.every((t) => t.id && t.id.trim() !== ''), 'ningún territorio sin id');
+});
+
+test('listar y vencidos filtran la zona sin distinguir acentos, como el resto', async () => {
+    const { datos } = await call('territorios_listar', { zona: 'sarria' });
+    assert.deepEqual(datos.territorios.map((t) => t.id).sort(), ['2', '5']);
+});
+
+test('buscar_por_id acepta el número escrito de otras maneras', async () => {
+    for (const id of ['4', ' 4 ', '04', 'Territorio 4', '#4']) {
+        const res = await call('territorios_buscar_por_id', { id });
+        assert.ok(!res.isError, `"${id}" debería encontrar el territorio 4`);
+        assert.equal(res.datos.id, '4');
+    }
+    const noExiste = await call('territorios_buscar_por_id', { id: '40' });
+    assert.equal(noExiste.isError, true);
+});
+
+test('sin_trabajar cita al publicador por su nombre canónico', async () => {
+    // En la hoja, el territorio 1 lo tiene "Ana Lopez" (sin tilde), pero la
+    // grafía mayoritaria es "Ana López": todas las tools deben decir la misma.
+    const { datos } = await call('territorios_sin_trabajar', { limit: 100 });
+    const t1 = datos.territorios.find((t) => t.id === '1');
+    assert.equal(t1.publicador, 'Ana López');
+});
+
+test('una hoja caída o despublicada es un error, no "0 territorios"', async () => {
+    const { loadTerritoryData, fetchTerritoryData } = await import('../src/lib/sheets.js');
+    const base = `http://127.0.0.1:${server.address().port}`;
+
+    await assert.rejects(loadTerritoryData(`${base}/caido`), /HTTP 500/);
+    await assert.rejects(loadTerritoryData(`${base}/despublicado`), /no devolvió un CSV/);
+    // La variante tolerante se mantiene por compatibilidad.
+    assert.deepEqual(await fetchTerritoryData(`${base}/caido`), []);
 });

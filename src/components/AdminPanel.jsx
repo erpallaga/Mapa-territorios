@@ -8,6 +8,22 @@ import {
 import { cn } from '../lib/utils'
 import { UserAvatar } from './UserAvatar'
 
+/**
+ * El mensaje útil de un error de `functions.invoke`. Para cualquier respuesta
+ * que no sea 2xx, supabase-js devuelve un genérico ("Edge Function returned a
+ * non-2xx status code") y el motivo real ("Admin access required", "Email is
+ * required"...) se queda en el cuerpo de la respuesta.
+ */
+async function mensajeDeInvokeError(err) {
+    try {
+        const body = await err?.context?.json?.()
+        if (body?.error) return body.details ? `${body.error} (${typeof body.details === 'string' ? body.details : JSON.stringify(body.details)})` : body.error
+    } catch {
+        // El cuerpo no era JSON: nos quedamos con el mensaje genérico.
+    }
+    return err?.message || String(err)
+}
+
 export function AdminPanel() {
     const [activeTab, setActiveTab] = useState('users')
 
@@ -83,38 +99,50 @@ function UsersTab() {
 
     async function toggleRole(userId, currentRole) {
         const newRole = currentRole === 'admin' ? 'user' : 'admin'
-        const { error } = await supabase
+        // Con RLS, un UPDATE sin permiso no da error: simplemente no toca
+        // ninguna fila. Por eso se pide la fila de vuelta y se comprueba.
+        const { data: updated, error } = await supabase
             .from('profiles')
             .update({ role: newRole, updated_at: new Date().toISOString() })
             .eq('id', userId)
+            .select('id')
 
-        if (!error) {
-            const targetUser = users.find(u => u.id === userId)
-            await supabase.from('audit_logs').insert({
-                actor_id: currentUser.id,
-                action: 'role_changed',
-                target_email: targetUser?.email,
-                details: { from: currentRole, to: newRole }
-            })
-            loadUsers()
+        if (error || !updated?.length) {
+            alert(`No se pudo cambiar el rol: ${error?.message || 'sin permiso para modificar este usuario'}`)
+            return
         }
+
+        const targetUser = users.find(u => u.id === userId)
+        await supabase.from('audit_logs').insert({
+            actor_id: currentUser.id,
+            action: 'role_changed',
+            target_email: targetUser?.email,
+            details: { from: currentRole, to: newRole }
+        })
+        loadUsers()
     }
 
     async function toggleActive(userId, isActive) {
-        const { error } = await supabase
+        // Con RLS, un UPDATE sin permiso no da error: simplemente no toca
+        // ninguna fila. Por eso se pide la fila de vuelta y se comprueba.
+        const { data: updated, error } = await supabase
             .from('profiles')
             .update({ is_active: !isActive, updated_at: new Date().toISOString() })
             .eq('id', userId)
+            .select('id')
 
-        if (!error) {
-            const targetUser = users.find(u => u.id === userId)
-            await supabase.from('audit_logs').insert({
-                actor_id: currentUser.id,
-                action: isActive ? 'user_deactivated' : 'user_activated',
-                target_email: targetUser?.email,
-            })
-            loadUsers()
+        if (error || !updated?.length) {
+            alert(`No se pudo cambiar el estado: ${error?.message || 'sin permiso para modificar este usuario'}`)
+            return
         }
+
+        const targetUser = users.find(u => u.id === userId)
+        await supabase.from('audit_logs').insert({
+            actor_id: currentUser.id,
+            action: isActive ? 'user_deactivated' : 'user_activated',
+            target_email: targetUser?.email,
+        })
+        loadUsers()
     }
 
     async function deleteUser(userId) {
@@ -122,6 +150,7 @@ function UsersTab() {
 
         try {
             const { data: { session } } = await supabase.auth.getSession()
+            if (!session) throw new Error('La sesión ha caducado. Vuelve a iniciar sesión.')
 
             const response = await fetch(
                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-user`,
@@ -296,7 +325,7 @@ function InvitationsTab() {
         setMessage(null)
 
         try {
-            const { error: invokeError } = await supabase.functions.invoke('send-invitation', {
+            const { data, error: invokeError } = await supabase.functions.invoke('send-invitation', {
                 body: {
                     email: email.trim(),
                     role,
@@ -308,11 +337,17 @@ function InvitationsTab() {
 
             if (invokeError) {
                 console.error("Function invoke error:", invokeError)
-                setMessage({ type: 'error', text: `Error del servidor: ${invokeError.message || JSON.stringify(invokeError)}` })
+                setMessage({ type: 'error', text: `Error del servidor: ${await mensajeDeInvokeError(invokeError)}` })
                 return
             }
 
-            setMessage({ type: 'success', text: `Invitación enviada a ${email}` })
+            // Si la persona ya tenía cuenta no se envía ningún email: decirlo.
+            setMessage({
+                type: 'success',
+                text: data?.note
+                    ? `${email} ya tenía cuenta: puede entrar directamente.`
+                    : `Invitación enviada a ${email}`,
+            })
             setEmail('')
             loadInvitations()
 
@@ -330,14 +365,17 @@ function InvitationsTab() {
             .update({ status: 'revoked', revoked_at: new Date().toISOString() })
             .eq('id', invId)
 
-        if (!error) {
-            await supabase.from('audit_logs').insert({
-                actor_id: currentUser.id,
-                action: 'invitation_revoked',
-                target_email: invEmail,
-            })
-            loadInvitations()
+        if (error) {
+            alert(`No se pudo revocar la invitación: ${error.message}`)
+            return
         }
+
+        await supabase.from('audit_logs').insert({
+            actor_id: currentUser.id,
+            action: 'invitation_revoked',
+            target_email: invEmail,
+        })
+        loadInvitations()
     }
 
     const statusColors = {

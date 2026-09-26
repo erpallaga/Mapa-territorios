@@ -1,6 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+const ROLES_VALIDOS = ['user', 'admin'];
+// Suficiente para rechazar erratas; la validación de verdad la hace Supabase Auth al enviar.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -41,14 +45,16 @@ Deno.serve(async (req: Request) => {
             });
         }
 
-        // Check if caller is admin
+        // Check if caller is an ACTIVE admin. Desactivar a un admin desde el
+        // panel pone is_active=false pero deja role='admin': sin mirar las dos
+        // cosas, un admin desactivado podía seguir invitando.
         const { data: profile, error: profileError } = await userClient
             .from('profiles')
-            .select('role')
+            .select('role, is_active')
             .eq('id', user.id)
             .single();
 
-        if (profileError || profile?.role !== 'admin') {
+        if (profileError || profile?.role !== 'admin' || profile?.is_active !== true) {
             return new Response(JSON.stringify({ error: 'Admin access required', details: profileError }), {
                 status: 403,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -56,9 +62,29 @@ Deno.serve(async (req: Request) => {
         }
 
         // Parse request body
-        const { email, role, siteUrl } = await req.json();
-        if (!email) {
-            return new Response(JSON.stringify({ error: 'Email is required' }), {
+        let body;
+        try {
+            body = await req.json();
+        } catch {
+            return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        const { siteUrl } = body ?? {};
+        // El trigger que acepta la invitación compara el email tal cual con el
+        // de la cuenta de Google, que llega en minúsculas: " Ana@X.com" no
+        // casaría nunca y la persona se quedaría pendiente de aprobación.
+        const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+        if (!email || !EMAIL_RE.test(email)) {
+            return new Response(JSON.stringify({ error: 'A valid email is required' }), {
+                status: 400,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+        const role = body?.role ?? 'user';
+        if (!ROLES_VALIDOS.includes(role)) {
+            return new Response(JSON.stringify({ error: `Invalid role (expected one of: ${ROLES_VALIDOS.join(', ')})` }), {
                 status: 400,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
@@ -72,7 +98,7 @@ Deno.serve(async (req: Request) => {
             .from('invitations')
             .insert({
                 email,
-                role: role || 'user',
+                role,
                 invited_by: user.id,
             })
             .select()
@@ -90,7 +116,7 @@ Deno.serve(async (req: Request) => {
             redirectTo: siteUrl || 'http://localhost:5173',
             data: {
                 invitation_token: invitation.token,
-                invited_role: role || 'user',
+                invited_role: role,
             },
         });
 
@@ -100,7 +126,7 @@ Deno.serve(async (req: Request) => {
                     actor_id: user.id,
                     action: 'invitation_created',
                     target_email: email,
-                    details: { role: role || 'user', note: 'User already registered' },
+                    details: { role, note: 'User already registered' },
                 });
 
                 return new Response(JSON.stringify({
@@ -123,7 +149,7 @@ Deno.serve(async (req: Request) => {
             actor_id: user.id,
             action: 'invitation_created',
             target_email: email,
-            details: { role: role || 'user' },
+            details: { role },
         });
 
         return new Response(JSON.stringify({
@@ -134,7 +160,7 @@ Deno.serve(async (req: Request) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
+        return new Response(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });

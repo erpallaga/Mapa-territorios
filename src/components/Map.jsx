@@ -14,6 +14,7 @@ import {
     mesesDesdeFinalizacion,
     pasesEnAnyoServicio,
 } from '../lib/completion';
+import { formatSheetDate, parseSheetDate } from '../lib/dates';
 import { Legend } from './Legend';
 
 // Fix for default Leaflet icon issues in React
@@ -29,6 +30,31 @@ let DefaultIcon = L.icon({
 });
 
 L.Marker.prototype.options.icon = DefaultIcon;
+
+// Sarrià-Les Corts. Solo se ve hasta que llegan los datos y se encuadran los
+// territorios, pero antes arrancaba en Madrid y el mapa daba un salto.
+const CENTRO_INICIAL = [41.3875, 2.1300];
+
+// Sin datos de la hoja (territorio del KML que no está en el Sheet): gris, no
+// rojo. Pintarlo como asignado escondía justo lo que hay que arreglar.
+const COLOR_SIN_DATOS = '#9ca3af';
+
+/**
+ * Los popups de Leaflet se insertan como HTML, y lo que se interpola sale de
+ * una hoja que se rellena a mano. Sin escapar, un "<" en un nombre rompía el
+ * popup, y cualquiera con permiso de edición en la hoja podía inyectar HTML
+ * en la app.
+ */
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[c]);
+}
+
+function fechaPopup(raw) {
+    const fecha = parseSheetDate(raw);
+    return fecha ? formatSheetDate(fecha) : (String(raw ?? '').trim() || '-');
+}
 
 function MapController({ bounds, flyTo }) {
     const map = useMap();
@@ -91,7 +117,58 @@ function getColorForServiceYear(cobertura, pases) {
     return cobertura === COBERTURA_EN_CURSO ? '#f59e0b' : '#ef4444';
 }
 
-export function Map({ territories, onTerritoryClick, selectedTerritory }) {
+function calcularBadges(features, viewMode) {
+    if (viewMode === '12months') {
+        return features.map(feature => {
+            const center = calculateFeatureCentroid(feature);
+            if (!center) return null;
+            const count = feature.properties.completionCount12m || 0;
+            return { position: center, label: String(count), id: feature.properties.id };
+        }).filter(Boolean);
+    }
+
+    if (viewMode === 'serviceYear') {
+        const hoy = new Date();
+        const anyo = anyoServicioDe(hoy);
+        return features.map(feature => {
+            const center = calculateFeatureCentroid(feature);
+            if (!center) return null;
+            const pases = pasesEnAnyoServicio(feature.properties, anyo, hoy);
+            return { position: center, label: String(pases), id: feature.properties.id };
+        }).filter(Boolean);
+    }
+
+    if (viewMode === 'expired') {
+        return features
+            .filter(f => f.properties.isExpired)
+            .map(feature => {
+                const center = calculateFeatureCentroid(feature);
+                if (!center) return null;
+                const days = feature.properties.expiredDays;
+                return { position: center, label: `${days}d`, id: feature.properties.id };
+            }).filter(Boolean);
+    }
+
+    return [];
+}
+
+function createBadgeIcon(label, viewMode) {
+    const isExpiredBadge = viewMode === 'expired';
+    const bgColor = isExpiredBadge ? '#fef3c7' : 'white';
+    const borderColor = isExpiredBadge ? '#d97706' : '#4b5563';
+    const textColor = isExpiredBadge ? '#92400e' : '#111827';
+    const fontSize = isExpiredBadge ? '9px' : '11px';
+    const size = isExpiredBadge ? 32 : 24;
+
+    return L.divIcon({
+        className: 'custom-badge-icon',
+        html: `<div style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size - 6}px;background:${bgColor};border-radius:9999px;border:2px solid ${borderColor};box-shadow:0 1px 2px rgba(0,0,0,0.15);font-size:${fontSize};font-weight:700;color:${textColor};line-height:1;">${label}</div>`,
+        iconSize: [size, size - 6],
+        iconAnchor: [size / 2, (size - 6) / 2]
+    });
+}
+
+export function Map({ territories, dataVersion = 0, onTerritoryClick, selectedTerritory }) {
     const [mapBounds, setMapBounds] = useState(null);
     const [viewMode, setViewMode] = useState('current'); // 'current' | '12months' | 'expired'
     const [flyToPos, setFlyToPos] = useState(null);
@@ -121,8 +198,10 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
     useEffect(() => {
         if (filteredTerritories) {
             const bounds = calculateBounds(filteredTerritories);
+            // Solo la primera vez: una recarga de datos (al volver a la
+            // pestaña) no debe deshacer el zoom que haya hecho el usuario.
             if (bounds) {
-                setMapBounds(bounds);
+                setMapBounds(prev => prev ?? bounds);
             }
         }
     }, [filteredTerritories]);
@@ -139,7 +218,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         let dashArray = '3';
 
         if (viewMode === 'current') {
-            fillColor = status === 'free' ? '#22c55e' : '#ef4444';
+            fillColor = status === 'free' ? '#22c55e' : status === 'assigned' ? '#ef4444' : COLOR_SIN_DATOS;
         } else if (viewMode === '12months') {
             // Mismo criterio que el panel: `lib/completion.js` cruza la columna
             // "última fecha en que se completó" con el historial y descarta las
@@ -198,6 +277,12 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         };
     }, [viewMode, highlightedId]);
 
+    // Los handlers de Leaflet se enganchan una vez por capa y se quedan con el
+    // `style` de ese momento. Al salir del hover se restauraba el estilo sin el
+    // resaltado del territorio elegido en la lista de caducados.
+    const styleRef = useRef(style);
+    useEffect(() => { styleRef.current = style; }, [style]);
+
     // Highlight on hover + click behavior
     const onEachFeature = (feature, layer) => {
         // In expired mode, bind a Leaflet popup for expired territories
@@ -208,13 +293,13 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             layer.bindPopup(
                 `<div style="font-family: system-ui, sans-serif; min-width: 160px;">
                     <div style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">
-                        Territorio ${props.id || props.name} ${dot}
+                        Territorio ${escapeHtml(props.id || props.name)} ${dot}
                     </div>
                     <div style="font-size: 13px; color: #555; margin-bottom: 3px;">
-                        <strong>Publicador:</strong> ${props.publisher || '-'}
+                        <strong>Publicador:</strong> ${escapeHtml(props.publisher || '-')}
                     </div>
                     <div style="font-size: 13px; color: #555; margin-bottom: 3px;">
-                        <strong>Asignado:</strong> ${props.assignedDate || '-'}
+                        <strong>Asignado:</strong> ${escapeHtml(fechaPopup(props.assignedDate))}
                     </div>
                     <div style="font-size: 14px; font-weight: 600; color: ${getExpiredColor(days)}; margin-top: 6px;">
                         ⏰ ${days} días caducado
@@ -240,7 +325,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             },
             mouseout: (e) => {
                 const layer = e.target;
-                layer.setStyle(style(feature));
+                layer.setStyle(styleRef.current(feature));
             },
             click: () => {
                 if (viewMode === 'expired') return;
@@ -249,59 +334,15 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
         });
     };
 
-    // Calculate markers for badges
+    // Calculate markers for badges.
+    // El icono se crea aquí, dentro del useMemo, y no en el render: un
+    // `L.divIcon` nuevo en cada render hacía que react-leaflet reemplazara el
+    // DOM de las ~180 etiquetas cada vez que se abría o cerraba un territorio.
     const badgeMarkers = useMemo(() => {
         if (!filteredTerritories) return [];
-
-        if (viewMode === '12months') {
-            return filteredTerritories.features.map(feature => {
-                const center = calculateFeatureCentroid(feature);
-                if (!center) return null;
-                const count = feature.properties.completionCount12m || 0;
-                return { position: center, label: String(count), id: feature.properties.id };
-            }).filter(Boolean);
-        }
-
-        if (viewMode === 'serviceYear') {
-            const hoy = new Date();
-            const anyo = anyoServicioDe(hoy);
-            return filteredTerritories.features.map(feature => {
-                const center = calculateFeatureCentroid(feature);
-                if (!center) return null;
-                const pases = pasesEnAnyoServicio(feature.properties, anyo, hoy);
-                return { position: center, label: String(pases), id: feature.properties.id };
-            }).filter(Boolean);
-        }
-
-        if (viewMode === 'expired') {
-            return filteredTerritories.features
-                .filter(f => f.properties.isExpired)
-                .map(feature => {
-                    const center = calculateFeatureCentroid(feature);
-                    if (!center) return null;
-                    const days = feature.properties.expiredDays;
-                    return { position: center, label: `${days}d`, id: feature.properties.id };
-                }).filter(Boolean);
-        }
-
-        return [];
+        return calcularBadges(filteredTerritories.features, viewMode)
+            .map(m => ({ ...m, icon: createBadgeIcon(m.label, viewMode) }));
     }, [filteredTerritories, viewMode]);
-
-    const createBadgeIcon = (label) => {
-        const isExpiredBadge = viewMode === 'expired';
-        const bgColor = isExpiredBadge ? '#fef3c7' : 'white';
-        const borderColor = isExpiredBadge ? '#d97706' : '#4b5563';
-        const textColor = isExpiredBadge ? '#92400e' : '#111827';
-        const fontSize = isExpiredBadge ? '9px' : '11px';
-        const size = isExpiredBadge ? 32 : 24;
-
-        return L.divIcon({
-            className: 'custom-badge-icon',
-            html: `<div style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size - 6}px;background:${bgColor};border-radius:9999px;border:2px solid ${borderColor};box-shadow:0 1px 2px rgba(0,0,0,0.15);font-size:${fontSize};font-weight:700;color:${textColor};line-height:1;">${label}</div>`,
-            iconSize: [size, size - 6],
-            iconAnchor: [size / 2, (size - 6) / 2]
-        });
-    };
 
     // Fly to + highlight a territory from the expired list
     const handleFlyToTerritory = useCallback((feature) => {
@@ -391,7 +432,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             </div>
 
             <MapContainer
-                center={[40.416775, -3.703790]}
+                center={CENTRO_INICIAL}
                 zoom={13}
                 scrollWheelZoom={true}
                 className="h-full w-full"
@@ -399,11 +440,11 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             >
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
                 {filteredTerritories && (
                     <GeoJSON
-                        key={viewMode}
+                        key={`${viewMode}-${dataVersion}`}
                         data={filteredTerritories}
                         style={style}
                         onEachFeature={onEachFeature}
@@ -416,7 +457,7 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
                     <Marker
                         key={`${viewMode}-${marker.id}`}
                         position={marker.position}
-                        icon={createBadgeIcon(marker.label)}
+                        icon={marker.icon}
                         interactive={false}
                     />
                 ))}
@@ -425,7 +466,11 @@ export function Map({ territories, onTerritoryClick, selectedTerritory }) {
             </MapContainer>
 
             {/* Map Legend */}
-            <Legend viewMode={viewMode} expiredListExpanded={expiredListExpanded} />
+            <Legend
+                viewMode={viewMode}
+                expiredListExpanded={expiredListExpanded}
+                hasExpiredList={expiredTerritories.length > 0}
+            />
 
             {/* Expired List Panel */}
             {viewMode === 'expired' && (

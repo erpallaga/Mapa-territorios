@@ -98,6 +98,19 @@ test('normalizeText quita acentos y mayúsculas', () => {
     assert.equal(normalizeText(null), '');
 });
 
+test('daysBetween no pierde un día al cruzar el cambio de hora', () => {
+    // La app se usa en Madrid: el último domingo de marzo el día tiene 23 h.
+    const tzPrevio = process.env.TZ;
+    process.env.TZ = 'Europe/Madrid';
+    try {
+        assert.equal(daysBetween(new Date(2026, 2, 20), new Date(2026, 2, 30)), 10);
+        assert.equal(daysBetween(new Date(2026, 9, 20), new Date(2026, 10, 1)), 12);
+    } finally {
+        if (tzPrevio === undefined) delete process.env.TZ;
+        else process.env.TZ = tzPrevio;
+    }
+});
+
 test('daysBetween ignora la hora', () => {
     assert.equal(daysBetween(new Date(2026, 5, 1), new Date(2026, 5, 30, 23, 59)), 29);
     assert.equal(daysBetween(new Date(2026, 5, 30), new Date(2026, 5, 1)), -29);

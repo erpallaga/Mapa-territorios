@@ -12,6 +12,19 @@ if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
 }
 
+/**
+ * Quita la altitud (Google My Maps exporta siempre 0) y redondea a 6 decimales
+ * (~11 cm), muy por debajo de lo que se distingue en el mapa. Reduce el JSON a
+ * menos de la mitad sin cambiar nada visible.
+ */
+function compactCoords(coords) {
+    if (!Array.isArray(coords)) return coords;
+    if (typeof coords[0] === 'number') {
+        return [Number(coords[0].toFixed(6)), Number(coords[1].toFixed(6))];
+    }
+    return coords.map(compactCoords);
+}
+
 // Initialize FeatureCollection
 const featureCollection = {
     type: 'FeatureCollection',
@@ -25,7 +38,11 @@ try {
         process.exit(1);
     }
 
-    const files = fs.readdirSync(kmlDirectory);
+    // Orden natural ("TERRITORIO 2" antes que "TERRITORIO 10"). `readdirSync`
+    // no garantiza orden, y un orden distinto en cada máquina regeneraba el
+    // JSON con un diff enorme sin ningún cambio real.
+    const files = fs.readdirSync(kmlDirectory)
+        .sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
     const kmlFiles = files.filter(file => path.extname(file).toLowerCase() === '.kml');
 
     if (kmlFiles.length === 0) {
@@ -47,6 +64,9 @@ try {
                             feature.properties = {};
                         }
                         feature.properties.sourceFile = file;
+                        if (feature.geometry) {
+                            feature.geometry.coordinates = compactCoords(feature.geometry.coordinates);
+                        }
                     });
                     featureCollection.features.push(...geoJson.features);
                 }
@@ -56,7 +76,8 @@ try {
         });
 
         // Write the merged FeatureCollection to the output file
-        fs.writeFileSync(outputPath, JSON.stringify(featureCollection, null, 2));
+        // Sin indentar: el fichero lo descarga cada usuario al abrir la app.
+        fs.writeFileSync(outputPath, JSON.stringify(featureCollection));
         console.log(`Successfully imported ${featureCollection.features.length} features from ${kmlFiles.length} files to ${outputPath}`);
     }
 
