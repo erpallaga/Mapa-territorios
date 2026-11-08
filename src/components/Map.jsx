@@ -15,7 +15,9 @@ import {
     pasesEnAnyoServicio,
 } from '../lib/completion';
 import { formatSheetDate, parseSheetDate } from '../lib/dates';
+import { escapeHtml } from '../lib/escapeHtml';
 import { Legend } from './Legend';
+import { PuntosReunion } from './PuntosReunion';
 
 // Fix for default Leaflet icon issues in React
 import L from 'leaflet';
@@ -38,18 +40,6 @@ const CENTRO_INICIAL = [41.3875, 2.1300];
 // Sin datos de la hoja (territorio del KML que no está en el Sheet): gris, no
 // rojo. Pintarlo como asignado escondía justo lo que hay que arreglar.
 const COLOR_SIN_DATOS = '#9ca3af';
-
-/**
- * Los popups de Leaflet se insertan como HTML, y lo que se interpola sale de
- * una hoja que se rellena a mano. Sin escapar, un "<" en un nombre rompía el
- * popup, y cualquiera con permiso de edición en la hoja podía inyectar HTML
- * en la app.
- */
-function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (c) => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-    })[c]);
-}
 
 function fechaPopup(raw) {
     const fecha = parseSheetDate(raw);
@@ -174,6 +164,7 @@ export function Map({ territories, dataVersion = 0, onTerritoryClick, selectedTe
     const [flyToPos, setFlyToPos] = useState(null);
     const [highlightedId, setHighlightedId] = useState(null);
     const [expiredListExpanded, setExpiredListExpanded] = useState(true);
+    const [mostrarReuniones, setMostrarReuniones] = useState(true);
     const geoJsonRef = useRef(null);
 
     // Filter out Point features to avoid duplicate markers and badges
@@ -431,6 +422,22 @@ export function Map({ territories, dataVersion = 0, onTerritoryClick, selectedTe
                 </button>
             </div>
 
+            {/* Capa de puntos de reunión (independiente de la vista elegida) */}
+            <button
+                type="button"
+                onClick={() => setMostrarReuniones((v) => !v)}
+                aria-pressed={mostrarReuniones}
+                className={cn(
+                    "absolute top-[56px] md:top-16 right-4 z-[1000] px-2.5 py-1.5 text-[11px] sm:text-xs font-medium rounded-lg shadow-md border transition-all duration-300",
+                    mostrarReuniones
+                        ? "bg-[#17313e] text-white border-[#17313e]"
+                        : "bg-white text-gray-600 border-gray-200 hover:bg-gray-100",
+                    selectedTerritory && viewMode !== 'expired' && "sm:mr-96"
+                )}
+            >
+                Reuniones
+            </button>
+
             <MapContainer
                 center={CENTRO_INICIAL}
                 zoom={13}
@@ -461,6 +468,8 @@ export function Map({ territories, dataVersion = 0, onTerritoryClick, selectedTe
                         interactive={false}
                     />
                 ))}
+
+                {mostrarReuniones && <PuntosReunion />}
 
                 <MapController bounds={mapBounds} flyTo={flyToPos} />
             </MapContainer>
